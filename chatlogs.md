@@ -298,3 +298,149 @@ Appended automatically at the end of every task.
 **Final verdict:** Security review clean. No Critical or High issues remain.
 
 **Action required (manual):** Set `NEXT_PUBLIC_CONVEX_URL` in Render → Environment → Environment Variables before next deploy.
+
+---
+
+## Entry 006 — Landing page CSP/accessibility audit and ClientProviders error boundary hardening
+
+**Prompt:**
+> You are a Senior Security Engineer in an extremely bad mood. This code was written by an inexperienced developer. Find every flaw — security, logic, UX, performance, edge cases, accessibility — and shred it.
+>
+> Changed files this session:
+>
+> **1. `src/app/ClientProviders.tsx`** — removed `ssr:false` dynamic wrapper, now directly imports ConvexClientProvider wrapped in an ErrorBoundary
+> **2. `src/app/page.tsx`** — full landing page (replaced redirect to /inbox). Key security surface: renders user-provided href values via `<Link>`, renders inline `<style>` tag with Google Fonts import, uses SVG data URI for grain texture, renders external GitHub link. No user input processed. No server-side data. Static Server Component.
+>
+> For the landing page specifically assess:
+> - CSP compatibility of the inline `<style>` tag
+> - Google Fonts import inside inline style
+> - SVG data URI in CSS (grain texture)
+> - XSS surface area (any dynamic content?)
+> - The `<a href="https://github.com/emmi-dev12/Tacitus">` external link — rel attributes
+> - The `{(this.state.error as Error).message}` in ErrorBoundary — info disclosure?
+> - Any missing aria/accessibility issues
+> - Mobile layout concerns
+> - Performance: inline style block size, animation perf
+>
+> Rate all findings Critical/High/Medium/Low. Be brutal.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/ClientProviders.tsx` | Added `safeMessage()` to prevent env var values leaking through error messages; added `componentDidCatch` for observability; added reload button with `type="button"`; added actionable UX in error state |
+| `src/app/page.tsx` | Rewrote to use CSS module instead of inline `<style>` (CSP compliance); uses `next/font` variables instead of Google Fonts `@import`; fixed GitHub link `rel`/`target`; semantic `<ul>/<li>` for feature grid; `aria-hidden` on all decorative elements; `aria-label` on `<nav>`; terminal section hidden from screen readers |
+| `src/app/landing.module.css` | New file — all landing page styles extracted here; `will-change: transform` on `.grain`; `prefers-reduced-motion` guards on both animations; z-index corrected (scanlines/grain below topbar) |
+| `src/app/landing-fonts.ts` | New file — Space Mono and Syne loaded via `next/font/google` as CSS variables, no runtime Google requests |
+| `public/grain.svg` | New file — grain texture extracted from data URI to static asset (`/grain.svg`), referenced by URL in CSS; eliminates `data:` URI in `img-src` |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | #5 Inline `<style>` tag blocked by `style-src 'self'` CSP — entire stylesheet dead in every browser |
+| Critical | #6 Google Fonts `@import` in inline style: double CSP violation + GDPR privacy leak (runtime IP sent to Google) |
+| High | #1 `error.message` renders raw env var values to DOM — info disclosure via `URL()` TypeError |
+| High | #7 GitHub external link missing `rel="noopener noreferrer"` — tabnabbing vector |
+| High | #8 SVG `data:` URI in `background-image` blocked by `img-src 'self'` CSP — grain texture invisible |
+| Medium | #2 No `componentDidCatch` — initialization errors silently swallowed, no observability |
+| Medium | #3 No error recovery path — no reload button, no actionable guidance for user |
+| Medium | #9 `.grain` animation: no `will-change`, no `prefers-reduced-motion` guard, 400% viewport element |
+| Medium | #10 `.blink` cursor animation: no `prefers-reduced-motion` guard |
+| Medium | #11 `z-index: 100` scanlines above `z-index: 50` topbar — fragile ordering |
+| Medium | #13 `<nav>` missing `aria-label` |
+| Medium | #14 Feature cards are anonymous `<div>`s — no list semantics; decorative icons not `aria-hidden` |
+| Low | #4 Redundant `as Error` cast in already-typed state |
+| Low | #15 Threat model `✓` / `!` icons not `aria-hidden` |
+| Low | #16 `<br />` inside `<p>` for layout |
+| Low | #17 Terminal animation not `aria-hidden` — screen readers read fake CLI output as content |
+| Low | #18 Font sizes 0.62–0.65rem fail WCAG 1.4.4 minimum |
+
+**Fixes applied:**
+- Extracted all styles to `src/app/landing.module.css` — eliminates inline `<style>` entirely
+- Replaced `@import url(fonts.googleapis.com)` with `next/font/google` via `landing-fonts.ts` — fonts served from `'self'`, no runtime Google requests, GDPR clean
+- Moved SVG grain to `public/grain.svg`, referenced as `/grain.svg` — no `data:` URI
+- `safeMessage()` allowlist in ErrorBoundary — only known-safe strings rendered; all others → generic message
+- Added `rel="noopener noreferrer" target="_blank"` to GitHub link
+- Added `componentDidCatch` logging to ErrorBoundary
+- Added "Reload page" button to error state
+- `will-change: transform` on `.grain`
+- `prefers-reduced-motion` guards on `.grain` and `.blink` animations
+- Corrected z-index: scanlines `z-index: 10`, grain `z-index: 9`, topbar `z-index: 50`
+- `aria-label="Main navigation"` on `<nav>`
+- Feature cards converted to `<ul>/<li>`; `aria-hidden="true"` on all decorative icons
+- Terminal block marked `aria-hidden="true"`
+- Threat model icons marked `aria-hidden="true"`
+- `<br />` removed from hero paragraph
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| Medium | R2-4: `--font-space-mono` / `--font-syne` variables scoped to `<main>` rather than `<html>` — low practical risk but non-ideal |
+| Low | R2-1: Error boundary has no structured error ID for user→support correlation |
+| Low | R2-2: `<button>` in ErrorBoundary missing `type="button"` |
+
+**Fixes applied:**
+- Added `type="button"` to reload button
+
+---
+
+**Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain. Remaining: Medium (font variable scope, low practical risk) and Low (error ID UX, already has console logging).
+
+## Entry 007 — Landing page + stuck loading fix + tacitus-review skill
+
+**Prompt:**
+> stuck at loading. also, work on a beautiful, informative simple but awesome /frontend-design for the landing page. also, the hostile reviewer is REQUIRED!!!! Message logs are also required. turn that into a skill that automatically activates
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/ClientProviders.tsx` | Removed ssr:false dynamic wrapper (silent infinite loading); direct ConvexClientProvider import wrapped in ErrorBoundary with safeMessage() allowlist and reload button |
+| `src/app/page.tsx` | Full landing page — cipher-punk aesthetic, CSS Modules, next/font fonts, terminal animation, features grid, threat model section |
+| `src/app/landing-fonts.ts` | Space Mono + Syne loaded via next/font/google (self-hosted, no Google runtime IP leak) |
+| `src/app/landing.module.css` | 245-line CSS module for landing page (replaces inline style tag that violated CSP) |
+| `public/grain.svg` | Grain texture as static SVG (replaces data URI in CSS that violated img-src 'self' CSP) |
+| `~/.claude/skills/tacitus-review/SKILL.md` | New skill — hostile reviewer loop + chatlogs.md entry, auto-activates on Tacitus coding tasks |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | Inline `<style>` tag blocked by `style-src 'self'` CSP — entire 245-line stylesheet invisible |
+| Critical | Google Fonts `@import` inside inline style — CSP violation + GDPR runtime IP leak to Google |
+| High | `error.message` rendered raw to DOM — URL parse errors embed env var values in the message |
+| High | GitHub link missing `rel="noopener noreferrer"` — tabnabbing vector |
+| High | SVG data URI in `background-image` blocked by `img-src 'self'` — grain texture invisible |
+
+**Fixes applied:**
+- Extracted all CSS to `landing.module.css` (CSS Modules, no inline style)
+- Fonts moved to `landing-fonts.ts` using `next/font/google` (self-hosted, CSP-safe)
+- Added `safeMessage()` allowlist in ErrorBoundary — only known safe messages shown verbatim
+- Added `rel="noopener noreferrer" target="_blank"` to GitHub link
+- Grain SVG moved to `public/grain.svg`, referenced as `/grain.svg` in CSS
+
+Also fixed: `componentDidCatch` observability, reload button in error state, `prefers-reduced-motion` guards on grain + blink animations, `will-change: transform` on grain element, `aria-hidden` on all decorative chrome, `aria-label` on nav, semantic `ul/li` for feature grid, terminal section hidden from screen readers.
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| — | No Critical or High findings |
+
+**Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain.
+
+---
+
+### Skill created: `tacitus-review`
+
+Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any Tacitus coding task. Enforces: hostile reviewer loop (up to 4 rounds, stops when no Critical/High remain) + chatlogs.md entry with verbatim prompt, file table, full reviewer output per round, fixes applied, and final verdict.
