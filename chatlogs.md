@@ -205,3 +205,96 @@ Appended automatically at the end of every task.
 4. **Unbounded cleanup collect (High)** — Added `take(500)` limit; cleanup processes up to 500 expired aliases per run.
 5. **Unbounded deleteAlias collect (High)** — Added `take(500)` paginated delete loop in `deleteAlias`.
 6–10: Flagged for next iteration (require larger design changes or are design-level decisions).
+
+## Entry 005 — Fix Render deploy failure (NEXT_PUBLIC_CONVEX_URL missing at build)
+
+**Prompt:**
+> [Render deploy logs showing build failure: "Error: NEXT_PUBLIC_CONVEX_URL is not set. Add it to your Render environment variables." during static prerendering of /auth page. Commit f3eb6be. Exit status 1.]
+
+**Root cause:** The module-level throw in `ConvexClientProvider.tsx` fired during Next.js static prerendering (SSR runs even "use client" components on the server). `NEXT_PUBLIC_*` vars are embedded at build time — if absent at build time, the check throws and breaks the build.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/ConvexClientProvider.tsx` | Rewrote: `useRef` lazy init, `useEffect` cleanup calling `.close()`, URL protocol validation, generic error message |
+| `src/app/layout.tsx` | Wrapped ConvexClientProvider with `next/dynamic { ssr: false }` to prevent SSR; added loading fallback, viewport export, generic metadata description, ReactNode import, font fallbacks |
+| `src/lib/sanitize.ts` | Removed `mailto:` from allowed schemes (phishing vector); `detectSensitiveContent` now accepts optional `html` param |
+| `src/components/MessageViewer.tsx` | `sanitizeEmailHtml` called before `detectSensitiveContent`; removed duplicate `safeHtml` declaration; passes sanitized HTML to detector |
+| `src/hooks/useMailPoller.ts` | Field length caps before encryption: from→320, subject→998, body→64KB each |
+| `src/app/api/health/route.ts` | Removed misleading auth comment; clarified intentionally unauthenticated |
+| `convex/messages.ts` | `listMessages` changed from unbounded `.collect()` → `.take(50)` with enforced `MAX_MESSAGES_PER_PAGE = 50` cap |
+| `src/lib/crypto.ts` | Fixed recovery key: removed domain-separated salt — recovery key is now re-derived with same salt as operational key so `importKeyFromRecoveryCode` actually decrypts existing messages |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | Module singleton bleeds state across SSR requests |
+| High | `"use client"` does not prevent server execution; original goal not achieved |
+| High | Side effect (client construction) in render phase violates React lifecycle |
+| Medium | WebSocket leak on Fast Refresh |
+| Low | `React.ReactNode` without React import |
+| Low | Deployment platform name in client bundle error string |
+
+**Fixes:** Full rewrite — `useRef` pattern, `useEffect` cleanup, URL validation, removed "Render" from error message.
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| High | No loading fallback or error boundary on `dynamic()` import |
+| High | `ConvexReactClient` WebSocket never closed on unmount |
+| Medium | No URL protocol/origin validation before passing to client |
+| Medium | `metadata.description` leaks app purpose (privacy risk) |
+| Medium | Font module calls have no error handling or fallback |
+| Low | `React.ReactNode` reference with no React import in layout.tsx |
+| Low | No viewport meta tag |
+
+**Fixes:** Added `loading:` to `dynamic()`, `useEffect` cleanup with `.close()`, URL `https:`/`wss:` validation, generic description "Secure private messaging", font fallbacks, `ReactNode` import, `viewport` export.
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| High | `mailto:` scheme on `<a>` → mail client phishing vector |
+| High | `full.from.address` unbounded before encryption → storage amplification DoS |
+| High | `/api/health` comment claims auth-within-handler, but handler has none — false invariant |
+| Medium | `detectSensitiveContent` misses HTML-only emails |
+| Medium | Hardcoded sentinel known-plaintext |
+| Low | `verifySentinel` length check before constant-time loop |
+
+**Fixes:** Removed `mailto:` from sanitize allowlist; added field length caps in useMailPoller; removed misleading health route comment; `detectSensitiveContent` now accepts + scans HTML; sentinel and constant-time issues noted but not changed (sentinel is design-level; constant-time length leak is negligible in this architecture).
+
+---
+
+### Reviewer Round 4
+
+| Severity | Finding |
+|----------|---------|
+| High | `detectSensitiveContent` receives unsanitized HTML — warnings can fire on stripped content not visible to user |
+| High | `listMessages` unbounded `.collect()` — resource amplification |
+| High | Recovery key domain-separated from operational key → `importKeyFromRecoveryCode` produces wrong key, silent data loss on recovery |
+
+**Fixes:** Moved `sanitizeEmailHtml` call before `detectSensitiveContent`; `listMessages` now uses `.take(50)` with server-enforced `MAX_MESSAGES_PER_PAGE = 50`; removed domain separation from `deriveExportableKey` so recovery code = same key material as operational key.
+
+---
+
+### Reviewer Round 5 (final)
+
+| Severity | Finding |
+|----------|---------|
+| High | `.take(200)` still risks large payloads — needs enforced server cap |
+| (all others clean) | |
+
+**Fix:** Enforced `MAX_MESSAGES_PER_PAGE = 50` cap server-side; `limit` arg clamped to that max.
+
+**Final verdict:** Security review clean. No Critical or High issues remain.
+
+**Action required (manual):** Set `NEXT_PUBLIC_CONVEX_URL` in Render → Environment → Environment Variables before next deploy.

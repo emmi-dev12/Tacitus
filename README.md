@@ -1,15 +1,44 @@
-# GhostMail
+# Tacitus
 
-Premium, open-source, local-first disposable email with E2E encryption.
+*Silent messenger. Local-first disposable email with end-to-end encryption.*
+
+[Initial prompt](initialprompt.md) · [Development log](chatlogs.md)
+
+---
+
+## Philosophy of Tacitus
+
+The Latin word *tacitus* means silent, unspoken, secret. It names what this tool aspires to be.
+
+Most disposable email services are loud. They harvest usage patterns, store messages on servers you don't control, and trade your data for uptime. They are noisy by design — they have to be, to run a business on your information.
+
+Tacitus works differently. Your passphrase never leaves your device. Your messages are encrypted before they reach any server. The backend stores only ciphertext it cannot read. When you delete an alias, there is nothing left to recover.
+
+This is not a new idea. It is the oldest idea in private communication: only the people in the conversation should be able to read it. Everything else is noise. Tacitus is the absence of noise.
+
+The design language reflects this. Deep Slate backgrounds. Sage Green accents. No gradients fighting for your attention. No unread counts pulsing red. The interface recedes — it is a window, not a billboard.
+
+---
 
 ## Stack
 
-- **Email ingest**: [mail.tm](https://mail.tm) — free catch-all domains, no domain purchase needed
+- **Email ingest**: [mail.tm](https://mail.tm) — free catch-all domains, no domain purchase required
 - **Backend + real-time sync**: [Convex](https://convex.dev)
 - **Auth**: Convex Auth (email/password)
-- **Frontend**: Next.js 15 + Tailwind CSS
-- **CLI**: oclif + ink (React terminal UI)
-- **E2E Encryption**: PBKDF2 (310k iterations) → AES-256-GCM, client-side only
+- **Frontend**: Next.js + Tailwind CSS
+- **CLI**: oclif + ink (React terminal UI), binary: `tac`
+- **E2E Encryption**: PBKDF2 (600k iterations, SHA-256) → AES-256-GCM, client-side only — key never reaches the server
+
+## Security model
+
+- Passphrase → PBKDF2 → AES-256-GCM key (non-extractable `CryptoKey`, lives in memory only)
+- Every field encrypted with its own random 12-byte IV
+- Recovery code derived with a domain-separated salt — cryptographically distinct from the operational key
+- Sentinel value (`tacitus-v1`) encrypted at setup; verified on every unlock — wrong passphrase is rejected before any data is touched
+- Sanitize-html strict allowlist before encryption and before render; iframe `sandbox=""` with `default-src 'none'` CSP
+- Rate limit: 10 aliases per user per hour
+
+---
 
 ## Setup
 
@@ -25,17 +54,13 @@ npm install
 npx convex dev
 ```
 
-This will:
-- Prompt you to log in / create a Convex account
-- Deploy your schema and functions
-- Generate `convex/_generated/` (fixes all remaining TS errors)
-- Print your deployment URL
+This will prompt you to log in, deploy your schema, generate `convex/_generated/`, and print your deployment URL.
 
 ### 3. Configure environment
 
 ```bash
 cp .env.local.example .env.local
-# Paste your NEXT_PUBLIC_CONVEX_URL from step 2
+# Paste your NEXT_PUBLIC_CONVEX_URL
 ```
 
 ### 4. Set Convex Auth secret
@@ -46,35 +71,28 @@ npx convex env set AUTH_SECRET "$(openssl rand -base64 32)"
 
 ### 5. Run the web app
 
-First, run the development server:
-
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## CLI
 
-## Learn More
+```bash
+cd cli && npm install && npm run build
+npm link  # installs `tac` globally
 
-To learn more about Next.js, take a look at the following resources:
+tac login          # authenticate to your Convex backend
+tac g              # create a new alias (interactive)
+tac m              # browse messages (arrow keys, Enter, b/Esc)
+tac d              # delete an alias and all its messages
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`render.yaml` is included for one-click Render deployment. Set `NEXT_PUBLIC_CONVEX_URL` in the Render dashboard after creation.

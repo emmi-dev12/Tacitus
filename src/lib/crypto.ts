@@ -41,9 +41,11 @@ export async function deriveKey(
   );
 }
 
-// ── Recovery code: a separate exportable key derived from the same passphrase ─
-// We never make the operational key extractable. Instead we derive a second key
-// with a domain-separated salt only for recovery export.
+// ── Recovery code: an exportable copy of the operational key material ─────────
+// We never make the operational key extractable. Instead we re-derive it with
+// the same parameters but extractable:true, then export the raw bytes.
+// The recovery code IS the operational key — importing it produces a key that
+// can decrypt all existing messages.
 
 async function deriveExportableKey(passphrase: string, saltBase64: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
@@ -54,18 +56,12 @@ async function deriveExportableKey(passphrase: string, saltBase64: string): Prom
     false,
     ["deriveKey"],
   );
-  // Domain-separate the recovery key so it is cryptographically distinct from the operational key
-  const prefix = enc.encode("tacitus-recovery-v1:");
-  const saltBytes = base64ToUint8(saltBase64);
-  const separatedSalt = new Uint8Array(prefix.length + saltBytes.length);
-  separatedSalt.set(prefix);
-  separatedSalt.set(saltBytes, prefix.length);
-  const salt = separatedSalt.buffer.slice(0) as ArrayBuffer;
+  const salt = base64ToUint8(saltBase64).buffer.slice(0) as ArrayBuffer;
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: PBKDF2_HASH },
     baseKey,
     { name: AES_MODE, length: KEY_LENGTH },
-    true,  // exportable only for this secondary recovery key
+    true,  // extractable — only used to export bytes into the recovery code
     ["encrypt", "decrypt"],
   );
 }

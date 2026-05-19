@@ -53,12 +53,13 @@ export function useMailPoller(
               const bodyHtml = sanitizeEmailHtml(
                 Array.isArray(full.html) ? full.html.join("") : (full.html ?? ""),
               );
+              const MAX_FIELD = 64 * 1024; // 64 KB per field before encryption
               const encrypted = await encryptMessage(
                 {
-                  from: full.from.address,
-                  subject: full.subject,
-                  bodyPlain: full.text ?? "",
-                  bodyHtml,
+                  from: full.from.address.slice(0, 320),       // RFC-5321 max addr length
+                  subject: (full.subject ?? "").slice(0, 998), // RFC-2822 subject limit
+                  bodyPlain: (full.text ?? "").slice(0, MAX_FIELD),
+                  bodyHtml: bodyHtml.slice(0, MAX_FIELD),
                 },
                 key,
               );

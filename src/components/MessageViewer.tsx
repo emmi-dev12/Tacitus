@@ -31,7 +31,8 @@ export function MessageViewer({ message, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false);
   const deleteMessage = useMutation(api.messages.deleteMessage);
 
-  const warnings = detectSensitiveContent(message.bodyPlain);
+  const safeHtml = sanitizeEmailHtml(message.bodyHtml);
+  const warnings = detectSensitiveContent(message.bodyPlain, safeHtml);
   const displayFrom = sanitizeDisplayText(message.from);
   const displaySubject = sanitizeDisplayText(message.subject);
 
@@ -41,8 +42,6 @@ export function MessageViewer({ message, onDelete }: Props) {
     onDelete?.();
   };
 
-  // Re-sanitize at render time — defense-in-depth against ingest bypass
-  const safeHtml = sanitizeEmailHtml(message.bodyHtml);
   const srcDoc = `<!DOCTYPE html>
 <html>
 <head>

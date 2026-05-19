@@ -16,18 +16,21 @@ function validateIv(value: string, name: string) {
   if (value.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(value)) throw new Error(`${name} is not a valid IV`);
 }
 
+const MAX_MESSAGES_PER_PAGE = 50;
+
 export const listMessages = query({
-  args: { aliasId: v.id("aliases") },
-  handler: async (ctx, { aliasId }) => {
+  args: { aliasId: v.id("aliases"), limit: v.optional(v.number()) },
+  handler: async (ctx, { aliasId, limit }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const alias = await ctx.db.get(aliasId);
     if (!alias || alias.userId !== userId) return [];
+    const take = Math.min(limit ?? MAX_MESSAGES_PER_PAGE, MAX_MESSAGES_PER_PAGE);
     return ctx.db
       .query("messages")
       .withIndex("by_aliasId", (q) => q.eq("aliasId", aliasId))
       .order("desc")
-      .collect();
+      .take(take);
   },
 });
 

@@ -23,8 +23,8 @@ export function sanitizeEmailHtml(html: string): string {
     allowedAttributes: ALLOWED_ATTRS,
     allowedSchemes: [],  // no schemes globally — each tag that needs them is listed below
     allowedSchemesByTag: {
-      a: ["https", "mailto"],
-      // img has no src allowed — allowedSchemesByTag entry not needed
+      a: ["https"],
+      // mailto: removed — renders clickable links that pre-populate attacker-controlled email drafts
     },
     // Strip inline styles entirely — prevents CSS injection
     allowedStyles: {},
@@ -57,6 +57,8 @@ const SENSITIVE_PATTERNS: Array<{ name: string; re: RegExp }> = [
 
 export function detectSensitiveContent(
   text: string,
+  html?: string,
 ): Array<{ name: string }> {
-  return SENSITIVE_PATTERNS.filter(({ re }) => re.test(text));
+  const combined = html ? `${text}\n${html}` : text;
+  return SENSITIVE_PATTERNS.filter(({ re }) => re.test(combined));
 }
