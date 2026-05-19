@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -49,57 +49,85 @@ function formatTime(ms: number): string {
 export function MessageList({ messages, cryptoKey, onSelect, selectedId }: Props) {
   const [decrypted, setDecrypted] = useState<Map<string, DecryptedMessage>>(new Map());
   const markRead = useMutation(api.messages.markRead);
+  // Track which IDs are already decrypted to avoid redundant SubtleCrypto calls.
+  // Must be cleared whenever cryptoKey changes to prevent serving stale plaintexts
+  // from a previous session's key.
+  const decryptedIds = useRef<Set<string>>(new Set());
+  const prevKeyRef = useRef<CryptoKey | null>(null);
 
   useEffect(() => {
-    const decrypt = async () => {
-      const results = new Map<string, DecryptedMessage>();
-      for (const msg of messages) {
-        try {
-          const plain = await decryptMessage(
-            {
-              encryptedFrom: msg.encryptedFrom,
-              ivFrom: msg.ivFrom,
-              encryptedSubject: msg.encryptedSubject,
-              ivSubject: msg.ivSubject,
-              encryptedBodyPlain: msg.encryptedBodyPlain,
-              ivBodyPlain: msg.ivBodyPlain,
-              encryptedBodyHtml: msg.encryptedBodyHtml,
-              ivBodyHtml: msg.ivBodyHtml,
-            },
-            cryptoKey,
-          );
-          results.set(msg._id, {
-            id: msg._id,
-            ...plain,
-            receivedAt: msg.receivedAt,
-            read: msg.read,
-          });
-        } catch {
-          // Decryption failure — skip message
+    // Reset the entire cache if the key changed (e.g., recovery restore, re-login).
+    if (prevKeyRef.current !== null && prevKeyRef.current !== cryptoKey) {
+      decryptedIds.current = new Set();
+      setDecrypted(new Map());
+    }
+    prevKeyRef.current = cryptoKey;
+
+    const newMessages = messages.filter((m) => !decryptedIds.current.has(m._id));
+    if (newMessages.length === 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const results = await Promise.all(
+        newMessages.map(async (msg) => {
+          try {
+            const plain = await decryptMessage(
+              {
+                encryptedFrom: msg.encryptedFrom,
+                ivFrom: msg.ivFrom,
+                encryptedSubject: msg.encryptedSubject,
+                ivSubject: msg.ivSubject,
+                encryptedBodyPlain: msg.encryptedBodyPlain,
+                ivBodyPlain: msg.ivBodyPlain,
+                encryptedBodyHtml: msg.encryptedBodyHtml,
+                ivBodyHtml: msg.ivBodyHtml,
+              },
+              cryptoKey,
+            );
+            return [msg._id, { id: msg._id, ...plain, receivedAt: msg.receivedAt, read: msg.read }] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+
+      setDecrypted((prev) => {
+        const next = new Map(prev);
+        for (const entry of results) {
+          if (entry) {
+            next.set(entry[0], entry[1]);
+            decryptedIds.current.add(entry[0]);
+          }
         }
-      }
-      setDecrypted(results);
-    };
-    decrypt();
+        return next;
+      });
+    })();
+
+    return () => { cancelled = true; };
   }, [messages, cryptoKey]);
 
   const handleSelect = async (msg: DecryptedMessage, raw: EncryptedMessage) => {
     onSelect(msg);
-    if (!raw.read) {
-      await markRead({ messageId: raw._id }).catch(() => {});
-    }
+    if (!raw.read) await markRead({ messageId: raw._id }).catch(() => {});
   };
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-slate-600">No messages yet</p>
+      <div style={{
+        flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "0.62rem", letterSpacing: "0.1em", color: "#1a2a36",
+        fontFamily: "var(--font-space-mono), monospace",
+      }}>
+        no messages
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1 overflow-y-auto p-2">
+    <div style={{ display: "flex", flexDirection: "column", overflowY: "auto", padding: "0.25rem" }}>
       {messages.map((raw) => {
         const msg = decrypted.get(raw._id);
         const isSelected = raw._id === selectedId;
@@ -108,23 +136,37 @@ export function MessageList({ messages, cryptoKey, onSelect, selectedId }: Props
           <button
             key={raw._id}
             onClick={() => msg && handleSelect(msg, raw)}
-            className={`w-full rounded-lg px-3 py-2.5 text-left transition-colors ${
-              isSelected
-                ? "bg-emerald-950/30 border border-emerald-600/40"
-                : "border border-transparent hover:bg-[#1E293B]"
-            }`}
+            style={{
+              width: "100%", textAlign: "left",
+              padding: "0.6rem 0.75rem", marginBottom: "0.1rem",
+              background: isSelected ? "rgba(0,255,140,0.05)" : "transparent",
+              border: isSelected ? "1px solid rgba(0,255,140,0.2)" : "1px solid transparent",
+              cursor: "pointer",
+              fontFamily: "var(--font-space-mono), monospace",
+              transition: "all 0.1s",
+            }}
+            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "rgba(0,255,140,0.02)"; }}
+            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
           >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className={`truncate text-xs ${raw.read ? "text-slate-500" : "font-semibold text-white"}`}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.2rem" }}>
+              <span style={{
+                fontSize: "0.68rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                color: raw.read ? "#2d4050" : "#c8d4e0",
+                fontWeight: raw.read ? 400 : 700,
+                flex: 1,
+              }}>
                 {msg?.from ?? "···"}
               </span>
-              <span className="shrink-0 text-[10px] text-slate-600">
+              <span style={{ fontSize: "0.56rem", color: "#1a2a36", letterSpacing: "0.06em", flexShrink: 0 }}>
                 {formatTime(raw.receivedAt)}
               </span>
             </div>
-            <p className={`truncate text-xs ${raw.read ? "text-slate-600" : "text-slate-300"}`}>
-              {msg?.subject ?? "Decrypting…"}
-            </p>
+            <div style={{
+              fontSize: "0.65rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              color: raw.read ? "#1a2a36" : "#4a6070",
+            }}>
+              {msg?.subject ?? "decrypting…"}
+            </div>
           </button>
         );
       })}

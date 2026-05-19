@@ -1,17 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { spaceMono, syne } from "@/app/landing-fonts";
 
 const THROTTLE_KEY = "tacitus_unlock_throttle";
-
-const RECOVERY_DISPLAY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const RECOVERY_DISPLAY_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface Props {
   mode: "setup" | "unlock";
-  onSetup?: (passphrase: string) => Promise<string>; // returns recovery code
+  onSetup?: (passphrase: string) => Promise<string>;
   onUnlock?: (passphrase: string) => Promise<void>;
   onRecovery?: (code: string) => Promise<void>;
 }
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box",
+  background: "#050a10",
+  border: "1px solid rgba(0,255,140,0.1)",
+  padding: "0.65rem 0.75rem",
+  fontSize: "0.8rem",
+  fontFamily: "var(--font-space-mono), monospace",
+  color: "#c8d4e0",
+  outline: "none",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d4050", marginBottom: "0.4rem",
+};
 
 export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) {
   const [passphrase, setPassphrase] = useState("");
@@ -26,7 +41,6 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
   const [unlockAttempts, setUnlockAttempts] = useState(0);
   const [unlockLockedUntil, setUnlockLockedUntil] = useState(0);
 
-  // Restore throttle state client-side only (localStorage is not available on SSR)
   useEffect(() => {
     try {
       const stored = localStorage.getItem(THROTTLE_KEY);
@@ -35,10 +49,9 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
         if (Number.isFinite(attempts) && attempts >= 0) setUnlockAttempts(attempts);
         if (Number.isFinite(lockedUntil) && lockedUntil >= 0) setUnlockLockedUntil(lockedUntil);
       }
-    } catch { /* ignore — state stays at defaults */ }
+    } catch { /* ignore */ }
   }, []);
 
-  // Auto-clear recovery code from DOM after timeout
   useEffect(() => {
     if (!recoveryCode) return;
     const timer = setTimeout(() => setRecoveryCode(null), RECOVERY_DISPLAY_TIMEOUT_MS);
@@ -48,14 +61,8 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (passphrase.length < 12) {
-      setError("Passphrase must be at least 12 characters");
-      return;
-    }
-    if (passphrase !== confirm) {
-      setError("Passphrases do not match");
-      return;
-    }
+    if (passphrase.length < 12) { setError("Passphrase must be at least 12 characters"); return; }
+    if (passphrase !== confirm) { setError("Passphrases do not match"); return; }
     setLoading(true);
     try {
       const code = await onSetup!(passphrase);
@@ -85,7 +92,6 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
       const next = unlockAttempts + 1;
       setUnlockAttempts(next);
       if (next >= 5) {
-        // Exponential back-off: 2^(n-5) * 30s, capped at 10 min
         const delayMs = Math.min(Math.pow(2, next - 5) * 30_000, 600_000);
         const lockedUntil = Date.now() + delayMs;
         setUnlockLockedUntil(lockedUntil);
@@ -113,149 +119,230 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
     }
   };
 
-  const copyRecovery = () => {
-    if (recoveryCode) {
-      navigator.clipboard.writeText(recoveryCode);
+  const copyRecovery = async () => {
+    if (!recoveryCode) return;
+    try {
+      await navigator.clipboard.writeText(recoveryCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Could not copy — select and copy the code manually.");
     }
   };
 
-  // Show recovery code after setup
+  const shell: React.CSSProperties = {
+    minHeight: "100vh",
+    background: "#080d14",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "1.5rem",
+    fontFamily: "var(--font-space-mono), monospace",
+    position: "relative",
+  };
+
+  const panel: React.CSSProperties = {
+    width: "100%", maxWidth: "440px",
+    border: "1px solid rgba(0,255,140,0.12)",
+    background: "rgba(8,13,20,0.98)",
+    padding: "2rem",
+  };
+
   if (recoveryCode) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0F172A] p-4">
-        <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#1E293B] bg-[#0F172A] p-8">
-          <div className="space-y-2">
-            <h1 className="text-xl font-semibold text-white">Save your recovery code</h1>
-            <p className="text-sm text-slate-400">
-              This is shown once. If you forget your passphrase, this code is the only way to recover your messages.
+      <div className={`${spaceMono.variable} ${syne.variable}`} style={shell}>
+        <div style={{ width: "100%", maxWidth: "440px" }}>
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <div style={{ fontSize: "1rem", fontWeight: 700, letterSpacing: "0.18em", color: "#00ff8c" }}>◈ TACITUS</div>
+            <div style={{ fontSize: "0.58rem", letterSpacing: "0.28em", color: "#2d4050", marginTop: "0.3rem" }}>SAVE RECOVERY CODE</div>
+          </div>
+          <div style={panel}>
+            <p style={{ fontSize: "0.72rem", lineHeight: 1.7, color: "#4a6070", marginBottom: "1.5rem", margin: "0 0 1.5rem" }}>
+              This code is shown <span style={{ color: "#c8d4e0" }}>once</span>. Store it in a password manager. Without it, a forgotten passphrase means permanent loss.
+            </p>
+            <div style={{
+              background: "#050a10",
+              border: "1px solid rgba(0,255,140,0.15)",
+              padding: "1rem",
+              marginBottom: "1rem",
+            }}>
+              <code style={{ fontSize: "0.72rem", lineHeight: 1.6, color: "#00ff8c", wordBreak: "break-all", display: "block" }}>
+                {recoveryCode}
+              </code>
+            </div>
+            <button
+              onClick={copyRecovery}
+              style={{
+                width: "100%", padding: "0.7rem", marginBottom: "1rem",
+                background: copied ? "rgba(0,255,140,0.1)" : "#00ff8c",
+                color: copied ? "#00ff8c" : "#080d14",
+                border: copied ? "1px solid rgba(0,255,140,0.3)" : "none",
+                fontSize: "0.65rem", letterSpacing: "0.14em", fontFamily: "inherit", fontWeight: 700,
+                cursor: "pointer",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))",
+              }}
+            >
+              {copied ? "✓ COPIED" : "COPY RECOVERY CODE"}
+            </button>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", marginBottom: "1rem" }}>
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => setAcknowledged(e.target.checked)}
+                style={{ accentColor: "#00ff8c" }}
+              />
+              <span style={{ fontSize: "0.65rem", color: "#4a6070", letterSpacing: "0.04em" }}>
+                I have saved this in a password manager
+              </span>
+            </label>
+            <button
+              disabled={!acknowledged}
+              onClick={() => setRecoveryCode(null)}
+              style={{
+                width: "100%", padding: "0.7rem",
+                background: "transparent",
+                color: acknowledged ? "#c8d4e0" : "#2d4050",
+                border: "1px solid rgba(0,255,140,0.1)",
+                fontSize: "0.65rem", letterSpacing: "0.1em", fontFamily: "inherit",
+                cursor: acknowledged ? "pointer" : "not-allowed",
+              }}
+            >
+              DONE — CLEAR AND CONTINUE
+            </button>
+            <p style={{ textAlign: "center", fontSize: "0.58rem", color: "#1a2a36", marginTop: "1rem", letterSpacing: "0.1em" }}>
+              AUTO-CLEARS IN 5 MIN
             </p>
           </div>
-          <div className="rounded-lg border border-[#1E293B] bg-[#0D1117] p-4">
-            <code className="break-all text-xs text-emerald-400">{recoveryCode}</code>
-          </div>
-          <button
-            onClick={copyRecovery}
-            className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
-          >
-            {copied ? "Copied!" : "Copy recovery code"}
-          </button>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(e) => setAcknowledged(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 accent-emerald-500"
-            />
-            <span className="text-xs text-slate-400">
-              I have saved this code in a password manager
-            </span>
-          </label>
-          <button
-            disabled={!acknowledged}
-            onClick={() => setRecoveryCode(null)}
-            className="w-full rounded-lg border border-[#1E293B] px-4 py-2 text-sm text-slate-400 hover:text-white disabled:opacity-40"
-          >
-            Done — clear and continue
-          </button>
-          <p className="text-center text-[10px] text-slate-600">
-            This code auto-clears in 5 minutes.
-          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0F172A] p-4">
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#1E293B] bg-[#0F172A] p-8">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold text-white">
-            {mode === "setup" ? "Set your encryption passphrase" : "Unlock your inbox"}
-          </h1>
-          <p className="text-sm text-slate-400">
+    <div className={`${spaceMono.variable} ${syne.variable}`} style={shell}>
+      <div style={{ width: "100%", maxWidth: "440px" }}>
+        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <div style={{ fontSize: "1rem", fontWeight: 700, letterSpacing: "0.18em", color: "#00ff8c" }}>◈ TACITUS</div>
+          <div style={{ fontSize: "0.58rem", letterSpacing: "0.28em", color: "#2d4050", marginTop: "0.3rem" }}>
+            {mode === "setup" ? "INITIALIZE ENCRYPTION" : "DECRYPT SESSION"}
+          </div>
+        </div>
+        <div style={panel}>
+          <p style={{ fontSize: "0.72rem", lineHeight: 1.7, color: "#3a5060", marginBottom: "1.5rem", margin: "0 0 1.5rem" }}>
             {mode === "setup"
-              ? "This passphrase encrypts your messages locally. It never leaves your device."
+              ? "Your passphrase derives the encryption key locally. It never leaves this device."
               : "Enter your passphrase to decrypt your messages."}
           </p>
-        </div>
 
-        {!showRecovery ? (
-          <form onSubmit={mode === "setup" ? handleSetup : handleUnlock} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-400">Passphrase</label>
-              <input
-                type="password"
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                className="w-full rounded-lg border border-[#1E293B] bg-[#0D1117] px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                placeholder={mode === "setup" ? "At least 12 characters" : "Your passphrase"}
-                autoComplete={mode === "setup" ? "new-password" : "current-password"}
-                required
-              />
-            </div>
-            {mode === "setup" && (
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-400">Confirm passphrase</label>
+          {!showRecovery ? (
+            <form onSubmit={mode === "setup" ? handleSetup : handleUnlock} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div>
+                <div style={labelStyle}>PASSPHRASE</div>
                 <input
                   type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-lg border border-[#1E293B] bg-[#0D1117] px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                  placeholder="Repeat passphrase"
-                  autoComplete="new-password"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
+                  onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
+                  placeholder={mode === "setup" ? "min. 12 characters" : "············"}
+                  autoComplete={mode === "setup" ? "new-password" : "current-password"}
                   required
                 />
               </div>
-            )}
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {loading ? "Please wait…" : mode === "setup" ? "Set passphrase" : "Unlock"}
-            </button>
-            {mode === "unlock" && (
+              {mode === "setup" && (
+                <div>
+                  <div style={labelStyle}>CONFIRM PASSPHRASE</div>
+                  <input
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    style={inputStyle}
+                    onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
+                    onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
+                    placeholder="repeat passphrase"
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+              )}
+              {error && <div style={{ fontSize: "0.68rem", color: "#ff4455", letterSpacing: "0.04em" }}>✕ {error}</div>}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: "100%", padding: "0.75rem",
+                  background: loading ? "rgba(0,255,140,0.08)" : "#00ff8c",
+                  color: loading ? "#00ff8c" : "#080d14",
+                  border: loading ? "1px solid rgba(0,255,140,0.2)" : "none",
+                  fontSize: "0.68rem", letterSpacing: "0.14em", fontFamily: "inherit", fontWeight: 700,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {loading ? "DERIVING KEY…" : mode === "setup" ? "SET PASSPHRASE" : "UNLOCK"}
+              </button>
+              {mode === "unlock" && (
+                <button
+                  type="button"
+                  onClick={() => setShowRecovery(true)}
+                  style={{
+                    background: "none", border: "none", fontFamily: "inherit",
+                    fontSize: "0.62rem", letterSpacing: "0.08em", color: "#2d4050",
+                    cursor: "pointer", transition: "color 0.15s",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
+                >
+                  use recovery code instead
+                </button>
+              )}
+            </form>
+          ) : (
+            <form onSubmit={handleRecovery} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div>
+                <div style={labelStyle}>RECOVERY CODE</div>
+                <textarea
+                  value={recoveryInput}
+                  onChange={(e) => setRecoveryInput(e.target.value)}
+                  style={{ ...inputStyle, resize: "none", lineHeight: 1.6, color: "#00ff8c" }}
+                  onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
+                  onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
+                  placeholder="paste recovery code…"
+                  rows={3}
+                />
+              </div>
+              {error && <div style={{ fontSize: "0.68rem", color: "#ff4455" }}>✕ {error}</div>}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: "100%", padding: "0.75rem",
+                  background: "#00ff8c", color: "#080d14",
+                  border: "none",
+                  fontSize: "0.68rem", letterSpacing: "0.14em", fontFamily: "inherit", fontWeight: 700,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))",
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                {loading ? "RECOVERING…" : "RECOVER ACCESS"}
+              </button>
               <button
                 type="button"
-                onClick={() => setShowRecovery(true)}
-                className="w-full text-center text-xs text-slate-500 hover:text-slate-300"
+                onClick={() => { setShowRecovery(false); setRecoveryInput(""); }}
+                style={{
+                  background: "none", border: "none", fontFamily: "inherit",
+                  fontSize: "0.62rem", letterSpacing: "0.08em", color: "#2d4050",
+                  cursor: "pointer", transition: "color 0.15s",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
               >
-                Use recovery code instead
+                ← back to passphrase
               </button>
-            )}
-          </form>
-        ) : (
-          <form onSubmit={handleRecovery} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-400">Recovery code</label>
-              <textarea
-                value={recoveryInput}
-                onChange={(e) => setRecoveryInput(e.target.value)}
-                className="w-full rounded-lg border border-[#1E293B] bg-[#0D1117] px-3 py-2.5 text-xs text-emerald-400 placeholder-slate-600 outline-none focus:border-emerald-600"
-                placeholder="Paste your recovery code"
-                rows={3}
-              />
-            </div>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {loading ? "Recovering…" : "Recover access"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowRecovery(false)}
-              className="w-full text-center text-xs text-slate-500 hover:text-slate-300"
-            >
-              Back to passphrase
-            </button>
-          </form>
-        )}
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,17 @@ interface Props {
   onClose: () => void;
 }
 
+const inputStyle: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box",
+  background: "#050a10",
+  border: "1px solid rgba(0,255,140,0.1)",
+  padding: "0.6rem 0.75rem",
+  fontSize: "0.78rem",
+  fontFamily: "var(--font-space-mono), monospace",
+  color: "#c8d4e0",
+  outline: "none",
+};
+
 export function CreateAliasModal({ cryptoKey, onClose }: Props) {
   const [label, setLabel] = useState("");
   const [customPrefix, setCustomPrefix] = useState("");
@@ -22,9 +33,7 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
-      // Generate a strong random password for the mail.tm account
       const password = Array.from(
         crypto.getRandomValues(new Uint8Array(24)),
         (b) => b.toString(16).padStart(2, "0"),
@@ -33,7 +42,6 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
       const address = await generateAddress(customPrefix || undefined);
       const account = await createAccount(address, password);
 
-      // Encrypt both token and password so token can be refreshed if it expires
       const [encToken, encPassword] = await Promise.all([
         encrypt(account.token, cryptoKey),
         encrypt(password, cryptoKey),
@@ -58,59 +66,109 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-[#1E293B] bg-[#0F172A] p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">New alias</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 50,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.75)",
+      backdropFilter: "blur(8px)",
+      padding: "1.5rem",
+      fontFamily: "var(--font-space-mono), monospace",
+    }}>
+      <div style={{
+        width: "100%", maxWidth: "420px",
+        background: "#080d14",
+        border: "1px solid rgba(0,255,140,0.15)",
+        padding: "1.75rem",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+          <div>
+            <div style={{ fontSize: "0.58rem", letterSpacing: "0.24em", color: "#2d4050", marginBottom: "0.25rem" }}>NEW ALIAS</div>
+            <div style={{ fontSize: "0.9rem", fontFamily: "var(--font-syne), sans-serif", fontWeight: 700, color: "#c8d4e0" }}>
+              Create alias
+            </div>
+          </div>
+          <button
+            onClick={loading ? undefined : onClose}
+            disabled={loading}
+            style={{ background: "none", border: "none", color: loading ? "#1a2a36" : "#2d4050", fontSize: "1rem", cursor: loading ? "not-allowed" : "pointer", transition: "color 0.15s" }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#c8d4e0"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-400">Label</label>
+        <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <div style={{ fontSize: "0.58rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.4rem" }}>
+              LABEL
+            </div>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0D1117] px-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-600"
-              placeholder="e.g. Netflix signup"
+              style={inputStyle}
+              onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
+              placeholder="e.g. netflix-signup"
               maxLength={64}
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-400">
-              Custom prefix{" "}
-              <span className="font-normal text-slate-600">(optional)</span>
-            </label>
+          <div>
+            <div style={{ fontSize: "0.58rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.4rem" }}>
+              CUSTOM PREFIX <span style={{ opacity: 0.5 }}>(OPTIONAL)</span>
+            </div>
             <input
               value={customPrefix}
               onChange={(e) => setCustomPrefix(e.target.value)}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0D1117] px-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-600 font-mono"
-              placeholder="netflix-signup"
+              style={inputStyle}
+              onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
+              placeholder="my-prefix"
               maxLength={32}
               pattern="[a-zA-Z0-9\-_]*"
             />
-            <p className="text-[10px] text-slate-600">
-              Alphanumeric + hyphens only. A random suffix is appended.
-            </p>
+            <div style={{ fontSize: "0.58rem", color: "#1a2a36", marginTop: "0.35rem", letterSpacing: "0.06em" }}>
+              alphanumeric + hyphens · random suffix appended
+            </div>
           </div>
 
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && (
+            <div style={{ fontSize: "0.68rem", color: "#ff4455", letterSpacing: "0.04em" }}>✕ {error}</div>
+          )}
 
-          <div className="flex gap-2 pt-1">
+          <div style={{ display: "flex", gap: "0.5rem", paddingTop: "0.25rem" }}>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-[#1E293B] px-4 py-2 text-sm text-slate-400 hover:text-white"
+              disabled={loading}
+              style={{
+                flex: 1, padding: "0.65rem",
+                background: "none",
+                border: "1px solid rgba(0,255,140,0.1)",
+                color: "#2d4050", fontSize: "0.65rem", letterSpacing: "0.1em",
+                fontFamily: "inherit", cursor: "pointer", transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#c8d4e0"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.25)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "#2d4050"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.1)"; }}
             >
-              Cancel
+              CANCEL
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              style={{
+                flex: 1, padding: "0.65rem",
+                background: loading ? "rgba(0,255,140,0.08)" : "#00ff8c",
+                color: loading ? "#00ff8c" : "#080d14",
+                border: loading ? "1px solid rgba(0,255,140,0.2)" : "none",
+                fontSize: "0.65rem", letterSpacing: "0.1em", fontWeight: 700,
+                fontFamily: "inherit", cursor: loading ? "not-allowed" : "pointer",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))",
+                transition: "all 0.15s",
+              }}
             >
-              {loading ? "Creating…" : "Create alias"}
+              {loading ? "CREATING…" : "CREATE ALIAS"}
             </button>
           </div>
         </form>

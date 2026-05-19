@@ -26,10 +26,10 @@ interface Props {
 
 function formatTTL(expiresAt: number): string {
   const diff = expiresAt - Date.now();
-  if (diff <= 0) return "Expired";
+  if (diff <= 0) return "expired";
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  if (days > 0) return `${days}d ${hours}h left`;
+  if (days > 0) return `${days}d ${hours}h`;
   return `${hours}h left`;
 }
 
@@ -41,28 +41,38 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
   const deleteAlias = useMutation(api.aliases.deleteAlias);
   const setActiveStatus = useMutation(api.aliases.setActiveStatus);
 
-  const copy = (e: React.MouseEvent) => {
+  const copy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(alias.address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(alias.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard permission denied — silently ignore; user can select manually
+    }
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirming) { setConfirming(true); return; }
+    if (!confirming) { setConfirming(true); setDeleteWarning(null); return; }
     if (!cryptoKey) return;
     setDeleting(true);
     try {
-      // Decrypt the mail.tm token and delete the remote account first so the
-      // mailbox doesn't persist after the user believes they've removed it.
       const token = await decrypt(alias.encryptedMailTmToken, alias.tokenIv, cryptoKey);
+      // Intentional fallthrough: remote delete failure is non-fatal — we still remove
+      // the local record so the user isn't stuck with an alias they can't use.
       await deleteMailTmAccount(alias.mailTmAccountId, token).catch((err: unknown) => {
         console.error("Failed to delete mail.tm account:", err);
-        // Surface to user — mailbox may continue receiving email
-        setDeleteWarning("Mail.tm mailbox could not be deleted remotely. Your local alias record has been removed, but the remote mailbox may persist.");
+        setDeleteWarning("Remote mailbox could not be deleted. Local record removed.");
       });
-      await deleteAlias({ aliasId: alias._id });
+      try {
+        await deleteAlias({ aliasId: alias._id });
+        setConfirming(false);
+      } catch (err) {
+        console.error("Failed to delete alias record:", err);
+        setDeleteWarning("Remote mailbox deleted but local record could not be removed. Try again.");
+        setConfirming(false);
+      }
     } finally {
       setDeleting(false);
     }
@@ -79,75 +89,104 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
   return (
     <div
       onClick={onSelect}
-      className={`group relative cursor-pointer rounded-xl border p-4 transition-all ${
-        selected
-          ? "border-emerald-600/60 bg-emerald-950/20"
-          : "border-[#1E293B] bg-[#0D1117] hover:border-[#334155]"
-      }`}
+      style={{
+        cursor: "pointer",
+        border: selected
+          ? "1px solid rgba(0,255,140,0.35)"
+          : "1px solid rgba(0,255,140,0.06)",
+        background: selected ? "rgba(0,255,140,0.04)" : "transparent",
+        padding: "0.75rem",
+        marginBottom: "0.25rem",
+        transition: "all 0.15s",
+        position: "relative",
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) e.currentTarget.style.borderColor = "rgba(0,255,140,0.15)";
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) e.currentTarget.style.borderColor = "rgba(0,255,140,0.06)";
+      }}
+      className="group"
     >
-      {/* Remote delete warning */}
       {deleteWarning && (
-        <div className="mb-2 rounded-md bg-yellow-950/40 border border-yellow-800/40 px-3 py-2 text-[10px] text-yellow-400">
+        <div style={{
+          marginBottom: "0.5rem", padding: "0.4rem 0.6rem",
+          border: "1px solid rgba(255,180,0,0.2)", background: "rgba(255,180,0,0.05)",
+          fontSize: "0.6rem", lineHeight: 1.5, color: "#b08820",
+        }}>
           {deleteWarning}
         </div>
       )}
 
-      {/* Unread badge */}
       {unreadCount > 0 && (
-        <span className="absolute right-3 top-3 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white">
+        <span style={{
+          position: "absolute", top: "0.6rem", right: "0.6rem",
+          background: "#00ff8c", color: "#080d14",
+          fontSize: "0.58rem", fontWeight: 700,
+          padding: "0.1rem 0.4rem",
+          minWidth: "18px", textAlign: "center",
+        }}>
           {unreadCount}
         </span>
       )}
 
-      <div className="mb-2 flex items-start justify-between pr-6">
-        <div className="space-y-0.5">
-          <p className="text-xs font-medium text-slate-400">{alias.label}</p>
-          <p className="break-all font-mono text-sm text-white">{alias.address}</p>
+      <div style={{ marginBottom: "0.5rem", paddingRight: unreadCount > 0 ? "1.5rem" : 0 }}>
+        <div style={{ fontSize: "0.58rem", letterSpacing: "0.14em", color: "#2d4050", marginBottom: "0.25rem" }}>
+          {alias.label}
+        </div>
+        <div style={{
+          fontFamily: "var(--font-space-mono), monospace",
+          fontSize: "0.72rem", color: "#c8d4e0",
+          wordBreak: "break-all",
+        }}>
+          {alias.address}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* TTL badge */}
-        <span className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${
-          isExpired ? "bg-red-950 text-red-400" : "bg-slate-800 text-slate-400"
-        }`}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+        <span style={{
+          fontSize: "0.56rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
+          color: isExpired ? "#ff4455" : "#2d4050",
+          border: `1px solid ${isExpired ? "rgba(255,68,85,0.25)" : "rgba(0,255,140,0.06)"}`,
+        }}>
           {ttlStr}
         </span>
-
-        {/* Active toggle */}
-        <span className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${
-          alias.activeStatus ? "bg-emerald-950 text-emerald-400" : "bg-slate-800 text-slate-500"
-        }`}>
+        <span style={{
+          fontSize: "0.56rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
+          color: alias.activeStatus ? "#00ff8c" : "#2d4050",
+          border: `1px solid ${alias.activeStatus ? "rgba(0,255,140,0.2)" : "rgba(0,255,140,0.06)"}`,
+        }}>
           {alias.activeStatus ? "active" : "paused"}
         </span>
 
-        <div className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={copy}
-            title="Copy address"
-            className="rounded px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
-          >
-            {copied ? "✓" : "copy"}
-          </button>
-          <button
-            onClick={toggleActive}
-            title={alias.activeStatus ? "Pause" : "Resume"}
-            className="rounded px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
-          >
-            {alias.activeStatus ? "pause" : "resume"}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            title="Delete"
-            className={`rounded px-2 py-1 text-[10px] transition ${
-              confirming
-                ? "bg-red-900 text-red-300 hover:bg-red-800"
-                : "text-slate-500 hover:bg-slate-800 hover:text-red-400"
-            } disabled:opacity-50`}
-          >
-            {deleting ? "deleting…" : confirming ? "confirm?" : "delete"}
-          </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "0.25rem" }} className="opacity-0 group-hover:opacity-100" >
+          {[
+            { label: copied ? "✓" : "copy", onClick: copy },
+            { label: alias.activeStatus ? "pause" : "resume", onClick: toggleActive },
+            {
+              label: deleting ? "…" : confirming ? "confirm?" : "delete",
+              onClick: handleDelete,
+              danger: confirming,
+            },
+          ].map(({ label, onClick, danger }) => (
+            <button
+              key={label}
+              onClick={onClick as (e: React.MouseEvent) => void}
+              disabled={deleting}
+              style={{
+                background: danger ? "rgba(255,68,85,0.1)" : "none",
+                border: danger ? "1px solid rgba(255,68,85,0.25)" : "none",
+                color: danger ? "#ff6677" : "#2d4050",
+                fontSize: "0.58rem", fontFamily: "inherit", letterSpacing: "0.06em",
+                padding: "0.2rem 0.4rem", cursor: "pointer",
+                transition: "color 0.1s",
+              }}
+              onMouseEnter={(e) => { if (!danger) e.currentTarget.style.color = "#c8d4e0"; }}
+              onMouseLeave={(e) => { if (!danger) e.currentTarget.style.color = "#2d4050"; }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

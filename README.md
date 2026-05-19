@@ -16,7 +16,21 @@ Tacitus works differently. Your passphrase never leaves your device. Your messag
 
 This is not a new idea. It is the oldest idea in private communication: only the people in the conversation should be able to read it. Everything else is noise. Tacitus is the absence of noise.
 
-The design language reflects this. Deep Slate backgrounds. Sage Green accents. No gradients fighting for your attention. No unread counts pulsing red. The interface recedes — it is a window, not a billboard.
+The design language reflects this. The interface recedes — it is a window, not a billboard.
+
+### Color philosophy
+
+The palette has two colors. That is intentional.
+
+**`#080d14` — Void.**
+Not black. Black is a statement. `#080d14` is the color of a room with no lights on, a terminal that has been idle for hours, a wire that carries nothing. It is the absence of signal. Everything you see exists on top of this absence.
+
+**`#00ff8c` — Active.**
+Not green. Green is calm. `#00ff8c` is cathode-ray green — the color of a signal that has arrived, a bit that flipped, a key that derived. It is used exactly where computation is happening or has just happened: the logo mark, the cursor blink, the unread badge, the call-to-action. When you see this color, something real occurred.
+
+There are no gradients because gradients imply transition — something becoming something else. In Tacitus, things either exist or they do not. Data is either encrypted or it is not. You are either authenticated or you are not. The palette encodes this binary logic directly into the visual layer.
+
+The typography follows the same rule. Space Mono for data and controls — monospaced because every character takes equal space, no letter more important than another. Syne for headings — sharp geometry, no soft curves apologizing for being there.
 
 ---
 
@@ -93,6 +107,22 @@ tac d              # delete an alias and all its messages
 
 ---
 
-## Deploy
+## Deploy (Render Static Site)
 
-`render.yaml` is included for one-click Render deployment. Set `NEXT_PUBLIC_CONVEX_URL` in the Render dashboard after creation.
+The app builds to a fully static `out/` directory — no Node.js server required.
+
+| Field | Value |
+|---|---|
+| **Build command** | `npm install && npm run build` |
+| **Publish directory** | `out` |
+| **Root directory** | *(leave empty)* |
+
+**Environment variables** (set in Render dashboard):
+
+| Key | Value |
+|---|---|
+| `NEXT_PUBLIC_CONVEX_URL` | Your Convex deployment URL (e.g. `https://xxx.convex.cloud`) |
+
+> `PORT` is not needed — it only applies to web services, not static sites.
+
+Security headers (CSP, HSTS, etc.) are served via `public/_headers`, which Render's static hosting picks up automatically.

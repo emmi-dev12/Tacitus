@@ -15,14 +15,18 @@ import { setKey, getKey, clearKey, hasKey } from "@/lib/keyStore";
 
 export type KeyStatus = "loading" | "needs_setup" | "needs_unlock" | "unlocked";
 
-export function useEncryptionKey() {
+// isAuthenticated: pass useConvexAuth().isAuthenticated from the caller.
+// Skips the Convex profile query until Convex auth is confirmed client-side,
+// preventing an unauthenticated round-trip during hydration.
+export function useEncryptionKey(isAuthenticated: boolean = false) {
   const [status, setStatus] = useState<KeyStatus>("loading");
   const [error, setError] = useState<string | null>(null);
 
-  const profile = useQuery(api.users.getProfile);
+  const profile = useQuery(api.users.getProfile, isAuthenticated ? undefined : "skip");
   const setProfileMutation = useMutation(api.users.setProfile);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (profile === undefined) return; // still loading
     if (hasKey()) { setStatus("unlocked"); return; }
     if (profile === null) {
@@ -30,7 +34,7 @@ export function useEncryptionKey() {
     } else {
       setStatus("needs_unlock");
     }
-  }, [profile]);
+  }, [profile, isAuthenticated]);
 
   const setup = useCallback(
     async (passphrase: string): Promise<string> => {
@@ -57,7 +61,6 @@ export function useEncryptionKey() {
       if (!profile) throw new Error("No profile found");
       const key = await deriveKey(passphrase, profile.pbkdf2Salt);
 
-      // Verify passphrase is correct before accepting
       const valid = await verifySentinel(
         { encryptedSentinel: profile.encryptedSentinel, sentinelIv: profile.sentinelIv },
         key,
@@ -75,7 +78,6 @@ export function useEncryptionKey() {
     const key = await importKeyFromRecoveryCode(recoveryCode);
     if (!profile) throw new Error("No profile found");
 
-    // Still verify the sentinel with the recovered key
     const valid = await verifySentinel(
       { encryptedSentinel: profile.encryptedSentinel, sentinelIv: profile.sentinelIv },
       key,
@@ -84,6 +86,7 @@ export function useEncryptionKey() {
 
     setKey(key);
     setStatus("unlocked");
+    setError(null);
   }, [profile]);
 
   const getKeyOrThrow = useCallback((): CryptoKey => {

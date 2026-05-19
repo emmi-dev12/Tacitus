@@ -1,0 +1,8 @@
+/*
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://api.mail.tm; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src blob:; frame-ancestors 'none'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-Permitted-Cross-Domain-Policies: none
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=(), fullscreen=(self), interest-cohort=(), browsing-topics=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
