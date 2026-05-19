@@ -467,3 +467,31 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 | — | No Critical or High findings |
 
 **Final verdict:** Security review clean after 1 round — no Critical or High issues remain.
+
+## Entry 009 — Scope ClientProviders to auth+inbox routes only
+
+**Prompt:**
+> why is it taking so long to initialize?
+
+**Root cause:** `ClientProviders` (with `ssr:false`) was in the root layout, wrapping every route including the landing page. This meant every page showed the "Initializing…" spinner until the full Convex bundle loaded, hydrated, and connected — even the static landing page which has zero Convex dependencies.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/layout.tsx` | Removed `ClientProviders` — root layout is now pure HTML shell |
+| `src/app/auth/layout.tsx` | New sub-layout — wraps `/auth` with `ClientProviders` |
+| `src/app/inbox/layout.tsx` | New sub-layout — wraps `/inbox` with `ClientProviders` |
+
+**Result:** Landing page (`/`) is now a pure Server Component with full static HTML. No spinner. `ssr:false` dynamic import only fires when navigating to `/auth` or `/inbox`.
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| High (pre-existing) | Blanket `/api/*` middleware exclusion — future API routes would get no auth protection. Not introduced by this change. |
+| — | No new Critical or High issues introduced |
+
+**Final verdict:** Security review clean — no new Critical or High issues. Pre-existing `/api/*` middleware gap noted; enforce auth within any future API route handlers.
