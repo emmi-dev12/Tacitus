@@ -61,12 +61,16 @@ export const createAlias = mutation({
     // 12 bytes base64 = exactly 16 chars, no padding (12 % 3 = 0)
     if (args.tokenIv.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(args.tokenIv)) throw new Error("Invalid tokenIv");
     if (args.passwordIv.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(args.passwordIv)) throw new Error("Invalid passwordIv");
+    if (args.tokenIv === args.passwordIv) throw new Error("tokenIv and passwordIv must be distinct");
 
+    // _creationTime is auto-appended to every Convex index, so by_userId is
+    // effectively ["userId", "_creationTime"] and supports this range scan.
     const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
     const recentAliases = await ctx.db
       .query("aliases")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .filter((q) => q.gte(q.field("_creationTime"), windowStart))
+      .withIndex("by_userId", (q) =>
+        q.eq("userId", userId).gte("_creationTime", windowStart),
+      )
       .collect();
 
     if (recentAliases.length >= ALIAS_RATE_LIMIT) {
@@ -103,11 +107,18 @@ export const deleteAlias = mutation({
     const alias = await ctx.db.get(aliasId);
     if (!alias || alias.userId !== userId) throw new Error("Not found");
 
-    const messages = await ctx.db
+    // Paginate deletion to stay within Convex document budget (16,384 reads/mutation)
+    let batch = await ctx.db
       .query("messages")
       .withIndex("by_aliasId", (q) => q.eq("aliasId", aliasId))
-      .collect();
-    await Promise.all(messages.map((m) => ctx.db.delete(m._id)));
+      .take(500);
+    while (batch.length > 0) {
+      await Promise.all(batch.map((m) => ctx.db.delete(m._id)));
+      batch = await ctx.db
+        .query("messages")
+        .withIndex("by_aliasId", (q) => q.eq("aliasId", aliasId))
+        .take(500);
+    }
     await ctx.db.delete(aliasId);
   },
 });
