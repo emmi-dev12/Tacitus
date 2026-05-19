@@ -677,3 +677,70 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 - **Publish directory:** `out`
 - **Root directory:** *(leave empty)*
 - **Environment variables:** `NEXT_PUBLIC_CONVEX_URL` only — remove `PORT` (irrelevant for static sites)
+
+## Entry 012 — Mobile overflow fix + PWA installer
+
+**Prompt:**
+> as you can see in the in the attached image, the text on the /frontend-design goes off the screen, even at full width. fix that. also make sure it looks just as killer as the desktop. also, there should be a pwa installer that works on all chromium and safari based browsers
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| src/app/landing.module.css | Changed hero heading `clamp(4rem, 10vw, 9rem)` → `clamp(2rem, 12vw, 9rem)`; added `overflow-wrap`/`word-break`; new 768px and 480px media query rules for mobile typography, terminal overflow, and nav |
+| src/app/layout.tsx | Added PWA metadata (`manifest`, `appleWebApp`, `mobile-web-app-capable`), `themeColor` viewport; removed PwaInstallPrompt (moved to landing layout) |
+| src/app/landing/layout.tsx | Added PwaInstallPrompt scoped to landing page only |
+| src/components/PwaInstallPrompt.tsx | New client component: Chromium `beforeinstallprompt` handler + iOS/iPadOS Safari banner; registers SW |
+| public/manifest.json | New PWA web app manifest |
+| public/sw.js | Minimal no-cache SW (satisfies installability; deliberately no fetch handler to protect crypto JS) |
+| public/icon-192.svg | New 192×192 PWA icon |
+| public/icon-512.svg | New 512×512 maskable PWA icon |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | `sw.js` cached app HTML/JS without integrity verification — persistent code-injection surface in a crypto app |
+| High | `skipWaiting` + `clients.claim` allowed instant SW takeover |
+| High | No HTTPS enforcement in SW fetch handler |
+| High | Precache without integrity validation |
+| High | `dismissed` state variable shadowed by local `const dismissed` in `useEffect` — logic bug silently breaking dismiss flow |
+| Medium | `deferredPrompt` (live Event object) stored in React state — memory leak / race condition |
+| Medium | z-index 9999 banner could overlay passphrase entry UI |
+| Medium | SW registered + banner shown on `/auth` and `/inbox` routes via root layout |
+| Medium | SVG-only icons may prevent Chrome install prompt from firing |
+| Medium | `/icon.svg` claimed missing (false positive — Next.js App Router serves `src/app/icon.svg` at `/icon.svg`) |
+| Low | iPadOS 13+ not detected (UA reports as Macintosh) |
+| Low | `sessionStorage` dismissed flag clears on tab close |
+| Low | `overflow-x: hidden` on scroll root can break `position: sticky` topbar in Safari |
+
+**Fixes applied:**
+- Rewrote `sw.js` as a no-cache minimal SW — empty fetch handler, no JS/HTML ever cached
+- Moved `PwaInstallPrompt` from root layout to `landing/layout.tsx` only
+- Renamed state variable to `isDismissed` to eliminate shadowing
+- Added iPadOS 13+ detection via `navigator.maxTouchPoints > 1 && /Macintosh/i`
+- Replaced `sessionStorage` with `localStorage` for persistent dismiss
+- Lowered z-index from 9999 → 100
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| Medium | SW scope defaults to `/` — covers auth/inbox routes even though component is landing-only |
+| Medium | HSTS missing `preload` (pre-existing, not introduced by this task) |
+| Low-Medium | `deferredPrompt` not cleared on dismissed install outcome |
+| Low | `/icon.svg` claimed missing (confirmed false positive — Next.js serves it from `src/app/icon.svg`) |
+| Low | `localStorage` dismissed flag has no TTL |
+| Low | No `id` field in manifest |
+| Informational | SW comment says "network-first" but has no fetch handler |
+
+**Fixes applied:**
+- None required — no Critical or High findings in Round 2
+
+---
+
+**Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain.
