@@ -1,6 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GhostMail
 
-## Getting Started
+Premium, open-source, local-first disposable email with E2E encryption.
+
+## Stack
+
+- **Email ingest**: [mail.tm](https://mail.tm) — free catch-all domains, no domain purchase needed
+- **Backend + real-time sync**: [Convex](https://convex.dev)
+- **Auth**: Convex Auth (email/password)
+- **Frontend**: Next.js 15 + Tailwind CSS
+- **CLI**: oclif + ink (React terminal UI)
+- **E2E Encryption**: PBKDF2 (310k iterations) → AES-256-GCM, client-side only
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Initialize Convex
+
+```bash
+npx convex dev
+```
+
+This will:
+- Prompt you to log in / create a Convex account
+- Deploy your schema and functions
+- Generate `convex/_generated/` (fixes all remaining TS errors)
+- Print your deployment URL
+
+### 3. Configure environment
+
+```bash
+cp .env.local.example .env.local
+# Paste your NEXT_PUBLIC_CONVEX_URL from step 2
+```
+
+### 4. Set Convex Auth secret
+
+```bash
+npx convex env set AUTH_SECRET "$(openssl rand -base64 32)"
+```
+
+### 5. Run the web app
 
 First, run the development server:
 

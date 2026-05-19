@@ -1,0 +1,33 @@
+{
+  "name": "ghostmail-cli",
+  "version": "0.1.0",
+  "description": "GhostMail CLI — disposable email from your terminal",
+  "bin": {
+    "ghost": "./bin/run.js"
+  },
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --loader ts-node/esm src/index.ts"
+  },
+  "dependencies": {
+    "@oclif/core": "^4.0.0",
+    "convex": "^1.0.0",
+    "ink": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "keytar": "^7.9.0",
+    "react": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.6.0"
+  },
+  "oclif": {
+    "bin": "ghost",
+    "dirname": "ghostmail",
+    "commands": "./src/commands",
+    "plugins": []
+  }
+}
