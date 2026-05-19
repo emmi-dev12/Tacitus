@@ -1,7 +1,23 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
-import { ConvexClientProvider } from "./ConvexClientProvider";
+import dynamic from "next/dynamic";
+
+// ssr:false prevents ConvexAuthNextjsProvider from running hooks during static
+// prerendering (e.g. /_not-found), which causes "Cannot destructure isLoading
+// of undefined" because the Convex context isn't available server-side.
+// This is a Client Component so next/dynamic with ssr:false is allowed here.
+const ConvexClientProvider = dynamic(
+  () => import("./ConvexClientProvider").then((m) => m.ConvexClientProvider),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-[#0F172A]">
+        <span className="text-slate-500 text-sm font-mono">Initializing…</span>
+      </div>
+    ),
+  }
+);
 
 // Known safe error messages we expose verbatim to the user.
 // All other errors are collapsed to a generic message to prevent
