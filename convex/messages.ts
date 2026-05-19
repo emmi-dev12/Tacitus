@@ -4,7 +4,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 const MAX_ENCRYPTED_FIELD = 1024 * 512; // 512 KB
 const MAX_MSG_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
+const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})$/;
 
 function validateBase64Field(value: string, name: string) {
   if (value.length > MAX_ENCRYPTED_FIELD) throw new Error(`${name} exceeds maximum size`);
@@ -12,7 +12,8 @@ function validateBase64Field(value: string, name: string) {
 }
 
 function validateIv(value: string, name: string) {
-  if (!BASE64_RE.test(value) || value.length > 32) throw new Error(`${name} is not a valid IV`);
+  // 12 bytes base64 = exactly 16 chars, no padding (12 % 3 = 0)
+  if (value.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(value)) throw new Error(`${name} is not a valid IV`);
 }
 
 export const listMessages = query({
@@ -51,10 +52,8 @@ export const upsertMessage = mutation({
     const alias = await ctx.db.get(args.aliasId);
     if (!alias || alias.userId !== userId) throw new Error("Not found");
 
-    if (args.mailTmId.length > 128 || !BASE64_RE.test(args.mailTmId.replace(/-/g, "+"))) {
-      // mailTmId may be alphanumeric — just length-check
-      if (args.mailTmId.length > 128) throw new Error("Invalid mailTmId");
-    }
+    if (args.mailTmId.length > 128) throw new Error("Invalid mailTmId");
+    if (!/^[A-Za-z0-9_\-]+$/.test(args.mailTmId)) throw new Error("Invalid mailTmId format");
 
     const now = Date.now();
     if (args.receivedAt > now + 60_000) throw new Error("receivedAt in future");

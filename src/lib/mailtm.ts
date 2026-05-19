@@ -43,16 +43,23 @@ async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`mail.tm ${path} → ${res.status}: ${body}`);
+    throw new Error(`mail.tm ${path} → ${res.status}`);
   }
 
-  return res.json() as Promise<T>;
+  // Content-Length is advisory only (can be absent or spoofed) — byte check is the real guard
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > 5 * 1024 * 1024) throw new Error(`mail.tm ${path} response too large`);
+  const text = new TextDecoder().decode(buf);
+  return JSON.parse(text) as T;
 }
+
+const DOMAIN_RE = /^[a-z0-9][a-z0-9.\-]{1,253}\.[a-z]{2,}$/i;
 
 export async function getActiveDomains(): Promise<MailTmDomain[]> {
   const data = await apiFetch<{ "hydra:member": MailTmDomain[] }>("/domains");
-  return data["hydra:member"].filter((d) => d.isActive);
+  return data["hydra:member"].filter(
+    (d) => d.isActive && typeof d.domain === "string" && DOMAIN_RE.test(d.domain),
+  );
 }
 
 export async function createAccount(
@@ -124,10 +131,18 @@ export async function generateAddress(labelPrefix?: string): Promise<string> {
   const domains = await getActiveDomains();
   if (domains.length === 0) throw new Error("No active mail.tm domains");
 
-  const randBytes = crypto.getRandomValues(new Uint8Array(9)); // 9 bytes: 1 for domain index, 8 for local part
-  const domain = domains[randBytes[0] % domains.length];
+  const randBytes = crypto.getRandomValues(new Uint8Array(17)); // 17 bytes: 1 for domain index, 16 for local part
+  // Rejection sampling eliminates modulo bias in domain selection
+  const domainCount = domains.length;
+  const threshold = 256 - (256 % domainCount);
+  let domainByte = randBytes[0];
+  while (domainByte >= threshold) {
+    domainByte = crypto.getRandomValues(new Uint8Array(1))[0];
+  }
+  const domain = domains[domainByte % domainCount];
 
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789"; // 36 chars
+  // 32-char base32 alphabet: 256 % 32 === 0 — no modulo bias
+  const chars = "abcdefghijklmnopqrstuvwxyz234567";
   const randomPart = Array.from(randBytes.slice(1), (b) => chars[b % chars.length]).join("");
 
   const local = labelPrefix

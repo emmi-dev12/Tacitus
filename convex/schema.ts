@@ -8,7 +8,7 @@ export default defineSchema({
   userProfiles: defineTable({
     userId: v.string(),
     pbkdf2Salt: v.string(),
-    encryptedSentinel: v.string(), // AES-GCM encrypted "ghostmail-v1" — used to verify passphrase
+    encryptedSentinel: v.string(), // AES-GCM encrypted "tacitus-v1" — used to verify passphrase
     sentinelIv: v.string(),
   }).index("by_userId", ["userId"]),
 

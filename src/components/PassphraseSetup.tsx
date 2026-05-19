@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+
+const THROTTLE_KEY = "tacitus_unlock_throttle";
 
 const RECOVERY_DISPLAY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -21,6 +23,20 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [unlockAttempts, setUnlockAttempts] = useState(0);
+  const [unlockLockedUntil, setUnlockLockedUntil] = useState(0);
+
+  // Restore throttle state client-side only (localStorage is not available on SSR)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(THROTTLE_KEY);
+      if (stored) {
+        const { attempts, lockedUntil } = JSON.parse(stored);
+        if (Number.isFinite(attempts) && attempts >= 0) setUnlockAttempts(attempts);
+        if (Number.isFinite(lockedUntil) && lockedUntil >= 0) setUnlockLockedUntil(lockedUntil);
+      }
+    } catch { /* ignore — state stays at defaults */ }
+  }, []);
 
   // Auto-clear recovery code from DOM after timeout
   useEffect(() => {
@@ -54,11 +70,31 @@ export function PassphraseSetup({ mode, onSetup, onUnlock, onRecovery }: Props) 
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const now = Date.now();
+    if (unlockLockedUntil > now) {
+      const secs = Math.ceil((unlockLockedUntil - now) / 1000);
+      setError(`Too many attempts. Try again in ${secs}s`);
+      return;
+    }
     setLoading(true);
     try {
       await onUnlock!(passphrase);
+      setUnlockAttempts(0);
+      localStorage.removeItem(THROTTLE_KEY);
     } catch {
-      setError("Incorrect passphrase");
+      const next = unlockAttempts + 1;
+      setUnlockAttempts(next);
+      if (next >= 5) {
+        // Exponential back-off: 2^(n-5) * 30s, capped at 10 min
+        const delayMs = Math.min(Math.pow(2, next - 5) * 30_000, 600_000);
+        const lockedUntil = Date.now() + delayMs;
+        setUnlockLockedUntil(lockedUntil);
+        localStorage.setItem(THROTTLE_KEY, JSON.stringify({ attempts: next, lockedUntil }));
+        setError(`Too many attempts. Try again in ${Math.ceil(delayMs / 1000)}s`);
+      } else {
+        localStorage.setItem(THROTTLE_KEY, JSON.stringify({ attempts: next, lockedUntil: 0 }));
+        setError("Incorrect passphrase");
+      }
     } finally {
       setLoading(false);
     }

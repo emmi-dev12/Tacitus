@@ -16,6 +16,10 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (mode === "signup" && password.length < 12) {
+      setError("Password must be at least 12 characters");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -77,7 +81,7 @@ export default function AuthPage() {
             className="w-full rounded-lg border border-[#1E293B] bg-[#0F172A] px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-emerald-600"
             placeholder="Password"
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            minLength={mode === "signup" ? 8 : undefined}
+            minLength={mode === "signup" ? 12 : undefined}
             required
           />
           {error && <p className="text-xs text-red-400">{error}</p>}

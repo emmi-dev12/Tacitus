@@ -69,14 +69,14 @@ export function useMailPoller(
                 receivedAt: new Date(full.createdAt).getTime(),
               });
             } catch (e) {
-              console.error(`[ghostmail] message fetch error for alias ${alias._id}:`, e);
+              console.error(`[tacitus] message fetch error for alias ${alias._id}:`, e);
             }
           }
           // Success — reset backoff for this alias
         } catch (e) {
           hadError = true;
           const msg = e instanceof Error ? e.message : String(e);
-          console.error(`[ghostmail] poll error for alias ${alias._id}:`, e);
+          console.error(`[tacitus] poll error for alias ${alias._id}:`, e);
           setErrors((prev) => [
             ...prev.filter((x) => x.aliasId !== alias._id),
             { aliasId: alias._id, message: msg, at: Date.now() },

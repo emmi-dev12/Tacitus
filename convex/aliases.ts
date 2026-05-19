@@ -7,7 +7,7 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LABEL_LENGTH = 64;
 const MAX_ADDRESS_LENGTH = 254;
-const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
+const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})$/;
 
 function validateLabel(label: string) {
   if (label.length === 0 || label.length > MAX_LABEL_LENGTH) {
@@ -20,7 +20,8 @@ function validateLabel(label: string) {
 function validateAddress(address: string) {
   if (address.length > MAX_ADDRESS_LENGTH) throw new Error("Address too long");
   // Strict RFC 5321-compatible local-part + hostname pattern
-  const EMAIL_RE = /^[a-zA-Z0-9][a-zA-Z0-9.+\-_]{0,62}@[a-zA-Z0-9][a-zA-Z0-9.\-]{1,253}\.[a-zA-Z]{2,}$/;
+  // Negative lookahead (?!.*\.\.) prevents consecutive dots in domain (RFC 5321 §4.1.2)
+  const EMAIL_RE = /^[a-zA-Z0-9][a-zA-Z0-9.+\-_]{0,62}@(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9.\-]{1,253}\.[a-zA-Z]{2,}$/;
   if (!EMAIL_RE.test(address)) throw new Error("Invalid email address format");
 }
 
@@ -54,11 +55,12 @@ export const createAlias = mutation({
     validateLabel(args.label);
     validateAddress(args.address);
 
-    if (args.mailTmAccountId.length > 128) throw new Error("Invalid accountId");
-    if (args.encryptedMailTmToken.length > 2048) throw new Error("Token too long");
-    if (args.encryptedMailTmPassword.length > 2048) throw new Error("Password too long");
-    if (!BASE64_RE.test(args.tokenIv)) throw new Error("Invalid tokenIv");
-    if (!BASE64_RE.test(args.passwordIv)) throw new Error("Invalid passwordIv");
+    if (args.mailTmAccountId.length > 128 || !/^[A-Za-z0-9_\-]+$/.test(args.mailTmAccountId)) throw new Error("Invalid accountId");
+    if (args.encryptedMailTmToken.length > 2048 || !BASE64_RE.test(args.encryptedMailTmToken)) throw new Error("Invalid token");
+    if (args.encryptedMailTmPassword.length > 2048 || !BASE64_RE.test(args.encryptedMailTmPassword)) throw new Error("Invalid password");
+    // 12 bytes base64 = exactly 16 chars, no padding (12 % 3 = 0)
+    if (args.tokenIv.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(args.tokenIv)) throw new Error("Invalid tokenIv");
+    if (args.passwordIv.length !== 16 || !/^[A-Za-z0-9+/]{16}$/.test(args.passwordIv)) throw new Error("Invalid passwordIv");
 
     const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
     const recentAliases = await ctx.db

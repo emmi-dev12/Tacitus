@@ -43,12 +43,7 @@ export default function InboxPage() {
     selectedAliasId ? { aliasId: selectedAliasId } : "skip",
   ) ?? [];
 
-  // Unread counts per alias
-  const allMessages = useQuery(
-    api.messages.listMessages,
-    selectedAliasId ? { aliasId: selectedAliasId } : "skip",
-  ) ?? [];
-  const unreadCount = allMessages.filter((m) => !m.read).length;
+  const unreadCount = messages.filter((m) => !m.read).length;
 
   // Poll mail.tm for new messages
   useMailPoller(
@@ -159,6 +154,7 @@ export default function InboxPage() {
                     setSelectedAliasId(alias._id);
                     setSelectedMessage(null);
                   }}
+                  cryptoKey={cryptoKey}
                 />
               ))
             )}

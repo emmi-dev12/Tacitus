@@ -1,6 +1,4 @@
 import { internalMutation } from "./_generated/server";
-import { cronJobs } from "convex/server";
-import { internal } from "./_generated/api";
 
 export const deleteExpiredAliases = internalMutation({
   args: {},
@@ -12,6 +10,12 @@ export const deleteExpiredAliases = internalMutation({
       .withIndex("by_expiresAt", (q) => q.lte("expiresAt", now))
       .collect();
 
+    // Note: this cron cannot delete mail.tm accounts because the tokens are
+    // E2E-encrypted and the server never has the decryption key. Client-initiated
+    // alias deletion (AliasCard.handleDelete) calls deleteMailTmAccount before
+    // removing the Convex record. TTL-expired aliases that were never manually
+    // deleted leave orphaned mail.tm accounts; mail.tm garbage-collects inactive
+    // accounts on its own schedule.
     for (const alias of expired) {
       const messages = await ctx.db
         .query("messages")
@@ -22,11 +26,3 @@ export const deleteExpiredAliases = internalMutation({
     }
   },
 });
-
-const crons = cronJobs();
-crons.daily(
-  "delete expired aliases",
-  { hourUTC: 2, minuteUTC: 0 },
-  internal.cleanup.deleteExpiredAliases,
-);
-export default crons;

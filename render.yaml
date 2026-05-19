@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tacitus
+    runtime: node
+    nodeVersion: "20.19.0"
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_CONVEX_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+        sync: false

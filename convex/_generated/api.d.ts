@@ -8,7 +8,12 @@
  * @module
  */
 
+import type * as aliases from "../aliases.js";
 import type * as auth from "../auth.js";
+import type * as cleanup from "../cleanup.js";
+import type * as crons from "../crons.js";
+import type * as messages from "../messages.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +22,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aliases: typeof aliases;
   auth: typeof auth;
+  cleanup: typeof cleanup;
+  crons: typeof crons;
+  messages: typeof messages;
+  users: typeof users;
 }>;
 
 /**

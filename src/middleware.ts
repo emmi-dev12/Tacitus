@@ -13,5 +13,7 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
 });
 
 export const config = {
+  // /api routes (including /api/health) are intentionally excluded from auth middleware
+  // and are either public by design or protected within the route handler itself.
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

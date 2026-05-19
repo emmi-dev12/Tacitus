@@ -1,7 +1,10 @@
 {
-  "name": "ghostmail",
+  "name": "tacitus",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,7 +19,7 @@
     "sanitize-html": "^2.17.4"
   },
   "devDependencies": {
-    "@convex-dev/auth": "^0.0.92",
+    "@convex-dev/auth": "0.0.92",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.41",
     "@types/react": "^19",

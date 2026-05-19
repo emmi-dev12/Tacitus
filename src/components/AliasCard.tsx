@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { decrypt } from "@/lib/crypto";
+import { deleteMailTmAccount } from "@/lib/mailtm";
 
 interface Props {
   alias: {
@@ -12,10 +14,14 @@ interface Props {
     label: string;
     activeStatus: boolean;
     expiresAt: number;
+    mailTmAccountId: string;
+    encryptedMailTmToken: string;
+    tokenIv: string;
   };
   unreadCount: number;
   selected: boolean;
   onSelect: () => void;
+  cryptoKey: CryptoKey | null;
 }
 
 function formatTTL(expiresAt: number): string {
@@ -27,9 +33,11 @@ function formatTTL(expiresAt: number): string {
   return `${hours}h left`;
 }
 
-export function AliasCard({ alias, unreadCount, selected, onSelect }: Props) {
+export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }: Props) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
   const deleteAlias = useMutation(api.aliases.deleteAlias);
   const setActiveStatus = useMutation(api.aliases.setActiveStatus);
 
@@ -43,7 +51,21 @@ export function AliasCard({ alias, unreadCount, selected, onSelect }: Props) {
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirming) { setConfirming(true); return; }
-    await deleteAlias({ aliasId: alias._id });
+    if (!cryptoKey) return;
+    setDeleting(true);
+    try {
+      // Decrypt the mail.tm token and delete the remote account first so the
+      // mailbox doesn't persist after the user believes they've removed it.
+      const token = await decrypt(alias.encryptedMailTmToken, alias.tokenIv, cryptoKey);
+      await deleteMailTmAccount(alias.mailTmAccountId, token).catch((err: unknown) => {
+        console.error("Failed to delete mail.tm account:", err);
+        // Surface to user — mailbox may continue receiving email
+        setDeleteWarning("Mail.tm mailbox could not be deleted remotely. Your local alias record has been removed, but the remote mailbox may persist.");
+      });
+      await deleteAlias({ aliasId: alias._id });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const toggleActive = async (e: React.MouseEvent) => {
@@ -63,6 +85,13 @@ export function AliasCard({ alias, unreadCount, selected, onSelect }: Props) {
           : "border-[#1E293B] bg-[#0D1117] hover:border-[#334155]"
       }`}
     >
+      {/* Remote delete warning */}
+      {deleteWarning && (
+        <div className="mb-2 rounded-md bg-yellow-950/40 border border-yellow-800/40 px-3 py-2 text-[10px] text-yellow-400">
+          {deleteWarning}
+        </div>
+      )}
+
       {/* Unread badge */}
       {unreadCount > 0 && (
         <span className="absolute right-3 top-3 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white">
@@ -109,14 +138,15 @@ export function AliasCard({ alias, unreadCount, selected, onSelect }: Props) {
           </button>
           <button
             onClick={handleDelete}
+            disabled={deleting}
             title="Delete"
             className={`rounded px-2 py-1 text-[10px] transition ${
               confirming
                 ? "bg-red-900 text-red-300 hover:bg-red-800"
                 : "text-slate-500 hover:bg-slate-800 hover:text-red-400"
-            }`}
+            } disabled:opacity-50`}
           >
-            {confirming ? "confirm?" : "delete"}
+            {deleting ? "deleting…" : confirming ? "confirm?" : "delete"}
           </button>
         </div>
       </div>

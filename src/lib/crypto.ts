@@ -3,13 +3,13 @@
 // All crypto operations run client-side only. Key never leaves the browser.
 // AES-GCM: each encrypt call generates its own random 12-byte IV (never shared).
 
-const PBKDF2_ITERATIONS = 310_000;
+const PBKDF2_ITERATIONS = 600_000;
 const PBKDF2_HASH = "SHA-256";
 const KEY_LENGTH = 256;
 const AES_MODE = "AES-GCM";
 const IV_BYTES = 12;
 const SALT_BYTES = 32;
-const SENTINEL = "ghostmail-v1";
+const SENTINEL = "tacitus-v1";
 
 // ── Key derivation ──────────────────────────────────────────────────────────
 
@@ -54,7 +54,13 @@ async function deriveExportableKey(passphrase: string, saltBase64: string): Prom
     false,
     ["deriveKey"],
   );
-  const salt = base64ToUint8(saltBase64).buffer.slice(0) as ArrayBuffer;
+  // Domain-separate the recovery key so it is cryptographically distinct from the operational key
+  const prefix = enc.encode("tacitus-recovery-v1:");
+  const saltBytes = base64ToUint8(saltBase64);
+  const separatedSalt = new Uint8Array(prefix.length + saltBytes.length);
+  separatedSalt.set(prefix);
+  separatedSalt.set(saltBytes, prefix.length);
+  const salt = separatedSalt.buffer.slice(0) as ArrayBuffer;
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: PBKDF2_HASH },
     baseKey,
@@ -102,7 +108,13 @@ export async function verifySentinel(
 ): Promise<boolean> {
   try {
     const plain = await decrypt(pair.encryptedSentinel, pair.sentinelIv, key);
-    return plain === SENTINEL;
+    const enc = new TextEncoder();
+    const a = enc.encode(plain);
+    const b = enc.encode(SENTINEL);
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
   } catch {
     return false;
   }
@@ -199,11 +211,7 @@ export async function decryptMessage(
 // ── Base64 helpers ──────────────────────────────────────────────────────────
 
 export function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
 }
 
 export function base64ToUint8(b64: string): Uint8Array {
