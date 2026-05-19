@@ -444,3 +444,26 @@ Also fixed: `componentDidCatch` observability, reload button in error state, `pr
 ### Skill created: `tacitus-review`
 
 Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any Tacitus coding task. Enforces: hostile reviewer loop (up to 4 rounds, stops when no Critical/High remain) + chatlogs.md entry with verbatim prompt, file table, full reviewer output per round, fixes applied, and final verdict.
+
+## Entry 008 — Fix /_not-found prerender crash (ssr:false restore)
+
+**Prompt:**
+> [Render build log showing: TypeError: Cannot destructure property 'isLoading' of 'd(...)' as it is undefined. at /_not-found/page]
+
+**Root cause:** Removing `ssr:false` from `ClientProviders.tsx` caused `ConvexAuthNextjsProvider` to run hooks during static prerendering of `/_not-found`. The hook (`useConvexAuth` internally) had no Convex context during SSR, returning undefined, making destructuring crash.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/ClientProviders.tsx` | Restored `ssr:false` on `dynamic()` import — valid because file has `"use client"`. ErrorBoundary and safeMessage() preserved from Entry 007. |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| — | No Critical or High findings |
+
+**Final verdict:** Security review clean after 1 round — no Critical or High issues remain.
