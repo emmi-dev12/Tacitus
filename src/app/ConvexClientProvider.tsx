@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, type ReactNode } from "react";
-import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 
 function makeConvexClient(): ConvexReactClient {
@@ -28,8 +28,8 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ConvexAuthNextjsProvider client={clientRef.current}>
+    <ConvexAuthProvider client={clientRef.current}>
       {children}
-    </ConvexAuthNextjsProvider>
+    </ConvexAuthProvider>
   );
 }
