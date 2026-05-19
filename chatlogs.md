@@ -744,3 +744,85 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 ---
 
 **Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain.
+
+## Entry 013 — Replace email auth with username auth
+
+**Prompt:**
+> ok, now in the setup it says it needs an email, when all it needs is a convex db url and whatever
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| convex/auth.ts | Replaced email-based auth with username+password; added `usernameToEmail()` with allowlist validation (3–32 chars, `^[a-z0-9_-]+$`), password max 128 chars enforced server-side |
+| src/app/auth/page.tsx | Replaced email field with username field (`type="text"`); client-side username validation; `maxLength={128}` on password; sends lowercased trimmed username to server; clears username on mode toggle |
+| cli/src/commands/login.tsx | Updated CLI login step from email→username prompt; sends `username` param instead of `email` |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | Silent username collision: `usernameToEmail` stripped non-allowlist chars, so `alice!` and `alice` mapped to the same account |
+| High | No maximum username length — could DoS the strip regex |
+| High | Username enumeration timing oracle (missing vs wrong-password distinguishable via bcrypt timing) |
+| High | `@` injection guard was accidental, not explicit |
+| High | CLI `login.tsx` still sent `email` param — CLI auth completely broken |
+| High | All-stripped input (`!!!`) passed trim check, produced `@tacitus.local` synthetic email |
+| Medium | `deferredPrompt` live Event in React state; z-index; mode toggle not clearing username |
+
+**Fixes applied:**
+- Rewrote `usernameToEmail` to reject (not strip) non-allowlist chars via `^[a-z0-9_-]+$` regex
+- Added 3–32 char length bounds
+- Added explicit @ count assertion on synthetic email
+- Applied NFKC normalization before check (later reverted in Round 2)
+- Updated CLI to send `username` param
+- Added client-side username validation (length + regex) in auth page
+- Added `setUsername("")` to mode toggle handler
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| High | NFKC normalization ran before allowlist — fullwidth Unicode chars (ａｄｍｉｎ) folded to ASCII, bypassing collision protection |
+| High | Auth page sent `username.trim()` (not lowercased) to server while validation ran on lowercased value — inconsistency |
+| Medium | CLI sends raw server error strings to user |
+| Medium | No client-side username validation in CLI before network call |
+
+**Fixes applied:**
+- Removed NFKC normalization from `usernameToEmail` — allowlist runs on raw trimmed+lowercased input
+- Auth page now sends `trimmedUsername` (already lowercased) to server
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| High | No password maximum length — PBKDF2 DoS amplification via multi-MB password payload |
+| Medium | No `maxLength` on password input |
+| Medium | `minLength` HTML attr inconsistency; no signin minimum at HTML layer |
+| Low | `@` double-check dead code (allowlist already excludes `@`) |
+
+**Fixes applied:**
+- Added `params.password.length > 128` check in `profile()` covering both signIn and signUp
+- Added `maxLength={128}` to password `<input>`
+
+---
+
+### Reviewer Round 4
+
+| Severity | Finding |
+|----------|---------|
+| Low | `password` type guard allows non-string to skip length checks silently (provider rejects downstream) |
+| Low | Missing `maxLength={32}` on username input (server enforces; client validates in JS but no HTML cap) |
+
+**Fixes applied:**
+- None required — no Critical or High findings
+
+---
+
+**Final verdict:** Security review clean after 4 rounds — no Critical or High issues remain.

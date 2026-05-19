@@ -7,9 +7,9 @@ import { ConvexHttpClient } from "convex/browser";
 
 function LoginUI() {
   const { exit } = useApp();
-  const [step, setStep] = useState<"url" | "email" | "password" | "saving" | "done" | "error">("url");
+  const [step, setStep] = useState<"url" | "username" | "password" | "saving" | "done" | "error">("url");
   const [url, setUrl] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -28,10 +28,9 @@ function LoginUI() {
       if (parsed.pathname !== "/" && parsed.pathname !== "") throw new Error("URL must not have a path");
 
       const client = new ConvexHttpClient(url);
-      // Attempt Convex Auth password sign-in
       const result = await client.action("auth:signIn", {
         provider: "password",
-        params: { email: email.trim().toLowerCase(), password: pw, flow: "signIn" },
+        params: { username: username.trim().toLowerCase(), password: pw, flow: "signIn" },
       }) as { token?: string };
 
       if (!result?.token) throw new Error("Sign-in failed — check credentials");
@@ -47,13 +46,13 @@ function LoginUI() {
   if (step === "url") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail Login</Text>
+        <Text color="green">◆ Tacitus Login</Text>
         <Box>
           <Text color="gray">Convex URL: </Text>
           <TextInput
             value={url}
             onChange={setUrl}
-            onSubmit={() => setStep("email")}
+            onSubmit={() => setStep("username")}
             placeholder="https://xxx.convex.cloud"
           />
         </Box>
@@ -61,15 +60,15 @@ function LoginUI() {
     );
   }
 
-  if (step === "email") {
+  if (step === "username") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail Login</Text>
+        <Text color="green">◆ Tacitus Login</Text>
         <Box>
-          <Text color="gray">Email: </Text>
+          <Text color="gray">Username: </Text>
           <TextInput
-            value={email}
-            onChange={setEmail}
+            value={username}
+            onChange={setUsername}
             onSubmit={() => setStep("password")}
           />
         </Box>
@@ -80,7 +79,7 @@ function LoginUI() {
   if (step === "password") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail Login</Text>
+        <Text color="green">◆ Tacitus Login</Text>
         <Box>
           <Text color="gray">Password: </Text>
           <TextInput
@@ -100,7 +99,7 @@ function LoginUI() {
     return (
       <Box flexDirection="column" gap={1}>
         <Text color="green">✓ Logged in and credentials saved</Text>
-        <Text color="gray" dimColor>Run: ghost g  to create your first alias</Text>
+        <Text color="gray" dimColor>Run: tac g  to create your first alias</Text>
       </Box>
     );
   }
@@ -109,7 +108,7 @@ function LoginUI() {
 }
 
 export default class Login extends Command {
-  static description = "Log in to your GhostMail Convex backend";
+  static description = "Log in to your Tacitus Convex backend";
 
   async run() {
     const { waitUntilExit } = render(<LoginUI />);

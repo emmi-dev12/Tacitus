@@ -19,7 +19,7 @@ export default function AuthPage() {
   }, [isAuthenticated, authLoading, router]);
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,6 +27,19 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const trimmedUsername = username.trim().toLowerCase();
+    if (trimmedUsername.length < 3) {
+      setError("Username must be at least 3 characters");
+      return;
+    }
+    if (trimmedUsername.length > 32) {
+      setError("Username must be 32 characters or fewer");
+      return;
+    }
+    if (!/^[a-z0-9_-]+$/.test(trimmedUsername)) {
+      setError("Username may only contain letters, numbers, hyphens, and underscores");
+      return;
+    }
     if (mode === "signup" && password.length < 12) {
       setError("Password must be at least 12 characters");
       return;
@@ -34,13 +47,13 @@ export default function AuthPage() {
     setLoading(true);
     try {
       await signIn("password", {
-        email: email.trim().toLowerCase(),
+        username: trimmedUsername,
         password,
         flow: mode === "signup" ? "signUp" : "signIn",
       });
       router.push("/inbox");
     } catch {
-      setError(mode === "signup" ? "Could not create account" : "Invalid email or password");
+      setError(mode === "signup" ? "Could not create account" : "Invalid username or password");
     } finally {
       setLoading(false);
     }
@@ -128,7 +141,7 @@ export default function AuthPage() {
             {(["signin", "signup"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setError(null); setPassword(""); }}
+                onClick={() => { setMode(m); setError(null); setPassword(""); setUsername(""); }}
                 style={{
                   flex: 1, padding: "0.6rem",
                   fontSize: "0.65rem", fontFamily: "inherit",
@@ -149,12 +162,12 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             <div>
               <div style={{ fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d4050", marginBottom: "0.4rem" }}>
-                EMAIL
+                USERNAME
               </div>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 style={{
                   width: "100%", boxSizing: "border-box",
                   background: "#050a10",
@@ -167,8 +180,8 @@ export default function AuthPage() {
                 }}
                 onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
                 onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
-                placeholder="operator@domain.tld"
-                autoComplete="email"
+                placeholder="ghost-ops"
+                autoComplete="username"
                 required
               />
             </div>
@@ -196,6 +209,7 @@ export default function AuthPage() {
                 placeholder={mode === "signup" ? "min. 12 characters" : "············"}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 minLength={mode === "signup" ? 12 : undefined}
+                maxLength={128}
                 required
               />
             </div>
