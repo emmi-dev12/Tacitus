@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { spaceMono, syne } from "../landing-fonts";
-import { storeConvexUrl, getStoredConvexUrl, clearConvexConfig } from "@/lib/convexConfig";
+import { storeConvexUrl, getStoredConvexUrl } from "@/lib/convexConfig";
 
 // ---------------------------------------------------------------------------
 // Step types
@@ -177,8 +177,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
       </Body>
       <Body>
         This wizard takes ~5 minutes. You will need a free{" "}
-        <Anchor href="https://convex.dev">Convex</Anchor> account and{" "}
-        <Anchor href="https://nodejs.org">Node.js</Anchor> installed.
+        <Anchor href="https://convex.dev">Convex account</Anchor> — no technical knowledge required.
       </Body>
       <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.1)", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.65rem", color: "#4a8060", lineHeight: 1.6 }}>
         ◈ Your encryption key never leaves your browser.
@@ -198,15 +197,15 @@ function StepConvexAccount({ onNext }: { onNext: () => void }) {
   return (
     <>
       <Body>
-        Create a free <Anchor href="https://dashboard.convex.dev">Convex account</Anchor> and start a new project.
+        Create a free <Anchor href="https://dashboard.convex.dev">Convex account</Anchor>.
         Convex is free for personal use — no credit card required.
+        The next step will automatically create and deploy your project.
       </Body>
       <div style={{ marginBottom: "1.25rem" }}>
         <div style={{ fontSize: "0.6rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.75rem" }}>STEPS</div>
         {[
           ["1", "Go to dashboard.convex.dev"],
-          ["2", 'Sign up with GitHub or Google'],
-          ["3", 'Click "New Project" → give it a name (e.g. tacitus)'],
+          ["2", "Sign up with GitHub or Google"],
         ].map(([n, label]) => (
           <div key={n} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", marginBottom: "0.5rem" }}>
             <span style={{ fontSize: "0.6rem", color: "#00a060", letterSpacing: "0.1em", flexShrink: 0, marginTop: "1px" }}>[{n}]</span>
@@ -215,7 +214,7 @@ function StepConvexAccount({ onNext }: { onNext: () => void }) {
         ))}
       </div>
       <Check checked={done} onChange={setDone}>
-        I have a Convex account and created a project
+        I have a Convex account
       </Check>
       <NextBtn onClick={onNext} disabled={!done}>NEXT →</NextBtn>
     </>
@@ -223,33 +222,38 @@ function StepConvexAccount({ onNext }: { onNext: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Deploy backend
+// Step 2 — Deploy backend (one-click)
 // ---------------------------------------------------------------------------
+const DEPLOY_URL = "https://dashboard.convex.dev/new?template=https://github.com/emmi-dev12/Tacitus";
+
 function StepDeploy({ onNext }: { onNext: () => void }) {
   const [done, setDone] = useState(false);
 
   return (
     <>
       <Body>
-        Clone the Tacitus repository and deploy the backend to your Convex project.
+        Click the button below to deploy Tacitus to your Convex account. Convex will handle everything automatically — no terminal needed.
       </Body>
-      <div style={{ background: "rgba(255,40,40,0.04)", border: "1px solid rgba(255,40,40,0.2)", padding: "0.85rem", marginBottom: "1rem", fontSize: "0.63rem", color: "#c04040", lineHeight: 1.6 }}>
-        ⚠ <strong style={{ color: "#e06060" }}>Security:</strong> Only clone from the official Tacitus repository below.
-        Never run <code style={{ color: "#c8d4e0" }}>npm install</code> on code from an untrusted source.
-      </div>
-      <Code>{`git clone https://github.com/emmi-dev12/Tacitus
-cd Tacitus
-npm install
-npx convex deploy --prod`}</Code>
+      <a
+        href={DEPLOY_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "block", width: "100%", boxSizing: "border-box",
+          padding: "0.9rem", marginBottom: "1.25rem",
+          background: "#00ff8c", color: "#080d14",
+          fontSize: "0.72rem", letterSpacing: "0.15em", fontWeight: 700,
+          textAlign: "center", textDecoration: "none",
+          clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px))",
+        }}
+      >
+        DEPLOY TO CONVEX ↗
+      </a>
       <Body>
-        When prompted, select the project you just created. The command will print your deployment URL — you will need it in the next step.
+        After the deployment finishes, Convex will show your project dashboard. Keep that tab open — you will need it in the next step.
       </Body>
-      <div style={{ background: "rgba(255,200,0,0.04)", border: "1px solid rgba(255,200,0,0.1)", padding: "0.85rem", marginBottom: "1.25rem", fontSize: "0.63rem", color: "#a08040", lineHeight: 1.6 }}>
-        ⚠ Run <code style={{ color: "#c8d4e0" }}>npx convex deploy --prod</code> — not <code style={{ color: "#c8d4e0" }}>npx convex dev</code>.
-        The dev command is for local development only.
-      </div>
       <Check checked={done} onChange={setDone}>
-        Backend deployed — I can see my deployment URL in the Convex dashboard
+        Deployment is done — I can see my project in the Convex dashboard
       </Check>
       <NextBtn onClick={onNext} disabled={!done}>NEXT →</NextBtn>
     </>
@@ -257,27 +261,67 @@ npx convex deploy --prod`}</Code>
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Auth secret
+// Step 3 — Auth secret (browser-generated, no terminal)
 // ---------------------------------------------------------------------------
+const SESSION_SECRET_KEY = "tacitus_setup_auth_secret";
+
+function generateSecret(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function getOrCreateSecret(): string {
+  const stored = sessionStorage.getItem(SESSION_SECRET_KEY);
+  if (stored) return stored;
+  const fresh = generateSecret();
+  sessionStorage.setItem(SESSION_SECRET_KEY, fresh);
+  return fresh;
+}
+
 function StepAuthSecret({ onNext }: { onNext: () => void }) {
+  const [secret] = useState(() => getOrCreateSecret());
   const [done, setDone] = useState(false);
 
   return (
     <>
       <Body>
-        Set the auth secret in your Convex deployment. Run this command in the Tacitus project directory:
+        Your backend needs a secret key to sign login tokens. We have generated one for you — just copy it and paste it into the Convex dashboard.
       </Body>
-      <Code>{`npx convex env set AUTH_SECRET "$(openssl rand -base64 32)" --prod`}</Code>
-      <Body>
-        Alternatively, set it via the Convex dashboard:
-        <br />Dashboard → Your project → Settings → Environment Variables → Add <code style={{ color: "#c8d4e0" }}>AUTH_SECRET</code>
-      </Body>
-      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.1)", padding: "0.85rem", marginBottom: "1.25rem", fontSize: "0.63rem", color: "#4a8060", lineHeight: 1.6 }}>
-        ◈ Use a strong random value. This secret signs auth tokens for your deployment.
-        Never share it or commit it to version control.
+
+      <div style={{ fontSize: "0.6rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.5rem" }}>
+        YOUR AUTH_SECRET
       </div>
+      <Code>{secret}</Code>
+
+      <Body>
+        Open your Convex project dashboard, then go to{" "}
+        <span style={{ color: "#c8d4e0" }}>Settings → Environment Variables</span> and add a variable named{" "}
+        <code style={{ color: "#c8d4e0" }}>AUTH_SECRET</code> with the value above.
+      </Body>
+
+      <a
+        href="https://dashboard.convex.dev"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "block", width: "100%", boxSizing: "border-box",
+          padding: "0.75rem", marginBottom: "1.25rem",
+          background: "transparent", color: "#00ff8c",
+          border: "1px solid rgba(0,255,140,0.3)",
+          fontSize: "0.68rem", letterSpacing: "0.12em",
+          textAlign: "center", textDecoration: "none",
+        }}
+      >
+        OPEN CONVEX DASHBOARD ↗
+      </a>
+
+      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.1)", padding: "0.85rem", marginBottom: "1.25rem", fontSize: "0.63rem", color: "#4a8060", lineHeight: 1.6 }}>
+        ◈ This secret only exists here — copy it now. You will not need to store it anywhere else.
+      </div>
+
       <Check checked={done} onChange={setDone}>
-        AUTH_SECRET is set in my Convex deployment
+        I added AUTH_SECRET in the Convex dashboard
       </Check>
       <NextBtn onClick={onNext} disabled={!done}>NEXT →</NextBtn>
     </>
@@ -296,6 +340,7 @@ function StepConnect({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       storeConvexUrl(url);
+      sessionStorage.removeItem(SESSION_SECRET_KEY);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid URL");
@@ -426,7 +471,7 @@ export default function SetupPage() {
     return (
       <ReconfigurePrompt
         onContinue={() => router.replace("/landing")}
-        onReconfigure={() => { clearConvexConfig(); setStep(0); }}
+        onReconfigure={() => setStep(0)}
       />
     );
   }

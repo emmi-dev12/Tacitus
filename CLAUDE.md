@@ -82,9 +82,13 @@ Auth uses `@convex-dev/auth` with the `Password` provider. Users authenticate wi
 
 On signup the success screen shows a QR code encoding `origin/auth#u=USERNAME&p=PASSPHRASE`. The hash fragment is never sent to the server. On the receiving device `SigninView` reads `window.location.hash`, pre-fills the form, and immediately clears the fragment via `history.replaceState`.
 
+### BYOD setup wizard (`/setup`)
+
+First-time users who deploy their own Convex backend go through a 5-step wizard (`src/app/setup/`). It collects the Convex deployment URL, walks through `convex deploy` + auth provisioning steps, then stores the URL in `localStorage` via `src/lib/convexConfig.ts`. The stored URL is validated on every read: must be `https://` and match `*.convex.cloud` — rejects custom domains. `ClientProviders.tsx` reads this value to instantiate `ConvexReactClient`; missing or invalid URL redirects to `/setup`.
+
 ### CLI credentials (`cli/src/lib/config.ts`)
 
-Convex URL + auth token stored in the system keychain via `keytar`; falls back to `~/.ghostmail/config.json` (chmod 600, plaintext).
+Convex URL + auth token stored in the system keychain via `keytar`; falls back to `~/.tacitus/config.json` (chmod 600, plaintext).
 
 ### Security boundaries
 

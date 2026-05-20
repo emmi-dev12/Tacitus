@@ -1146,3 +1146,56 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 ---
 
 **Final verdict:** Security review clean after 3 rounds — no Critical or High issues remain. Remaining mediums: signOut() failure swallowed silently; recovery code path has no rate limiting; setPendingPassphrase/setProfile ordering (pre-existing); logout() naming in useEncryptionKey.ts.
+
+## Entry 018 — Simplify BYOD setup wizard for non-techies
+
+**Prompt:**
+> hey, lets simplify the setup flow a bit, can we somehow make it easier? non-techies would be scared sick of this: go setup convex, get passphrase, find it... too hard
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| src/app/setup/page.tsx | Rewrote Steps 1–3: removed terminal commands, added "Deploy to Convex" one-click button, browser-generated hex secret, sessionStorage persistence, deferred reconfigure clear logic |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| High | Step 1 told user to manually create a Convex project; Step 2 template also creates one — contradictory, leaves orphaned projects |
+| High | Refresh on Step 3 silently generated a new AUTH_SECRET; old one was already set in Convex dashboard |
+| Medium | `btoa(String.fromCharCode(...bytes))` spread anti-pattern; produces `+/=` chars that may be mangled on paste |
+| Medium | `clearConvexConfig()` fired immediately on "REPLACE" click with no undo; left app broken if wizard abandoned |
+| (Critical flagged) | Reviewer incorrectly claimed security headers missing — they exist in `public/_headers` for Render |
+
+**Fixes applied:**
+- Step 1: Removed instruction to create a project manually; now only says "sign up"
+- Step 3: Secret now stored in `sessionStorage` on generation, read back on reload, cleared on successful wizard completion
+- generateSecret: replaced `btoa(String.fromCharCode(...))` with `Array.from(bytes, b => b.toString(16).padStart(2,'0')).join('')` (hex, no special chars)
+- Reconfigure: deferred `clearConvexConfig` to successful save in StepConnect, threaded `isReconfigure` prop
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| High | Regression: `clearConvexConfig()` called before `storeConvexUrl()` — if new URL invalid, old config destroyed with no rollback |
+
+**Fixes applied:**
+- Realized `storeConvexUrl` overwrites the same localStorage key atomically — `clearConvexConfig` is redundant entirely
+- Removed `clearConvexConfig` from `StepConnect.handleSave`, removed `isReconfigure` prop/state, removed import
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| Low | `clearConvexConfig` still exported in `convexConfig.ts` (dead code); below High threshold |
+
+---
+
+**Final verdict:** Security review clean after 3 rounds — no Critical or High issues remain. One Low: `clearConvexConfig` export in `convexConfig.ts` is now unused dead code.
