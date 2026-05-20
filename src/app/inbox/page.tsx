@@ -59,7 +59,7 @@ const S = {
   },
   btnSignOut: {
     fontSize: "0.65rem", letterSpacing: "0.08em", fontFamily: "inherit",
-    color: "#2d4050", background: "none", border: "none",
+    color: "#5a7a8a", background: "none", border: "none",
     cursor: "pointer", transition: "color 0.15s",
   },
   body: { display: "flex", flex: 1, overflow: "hidden" },
@@ -71,7 +71,7 @@ const S = {
   paneHeader: {
     padding: "0.65rem 1rem",
     borderBottom: "1px solid rgba(0,255,140,0.06)",
-    fontSize: "0.58rem", letterSpacing: "0.24em", color: "#2d4050",
+    fontSize: "0.65rem", letterSpacing: "0.2em", color: "#5a8070",
   },
   midPane: {
     width: "256px", flexShrink: 0,
@@ -81,7 +81,7 @@ const S = {
   mainPane: { flex: 1, display: "flex", flexDirection: "column" as const, overflow: "hidden" },
   empty: {
     flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "0.65rem", letterSpacing: "0.1em", color: "#1a2a36",
+    fontSize: "0.65rem", letterSpacing: "0.1em", color: "#4a7060",
   },
   spinner: {
     height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
@@ -166,7 +166,7 @@ export default function InboxPage() {
             <button
               style={S.btnSignOut}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#c8d4e0")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#2d4050")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#5a7a8a")}
               onClick={async () => {
               logout();
               try { await signOut(); } finally { router.replace("/landing"); }
@@ -188,13 +188,13 @@ export default function InboxPage() {
                   <button
                     onClick={() => setShowCreate(true)}
                     style={{
-                      fontSize: "0.62rem", letterSpacing: "0.1em", fontFamily: "inherit",
-                      color: "#2d4050", background: "none",
-                      border: "1px dashed rgba(0,255,140,0.12)", padding: "0.5rem 1rem",
+                      fontSize: "0.68rem", letterSpacing: "0.1em", fontFamily: "inherit",
+                      color: "#5a8070", background: "none",
+                      border: "1px dashed rgba(0,255,140,0.2)", padding: "0.5rem 1rem",
                       cursor: "pointer", transition: "all 0.15s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#00ff8c"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.4)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "#2d4050"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.12)"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#00ff8c"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.5)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#5a8070"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.2)"; }}
                   >
                     create first alias
                   </button>

@@ -82,7 +82,7 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
           <div>
-            <div style={{ fontSize: "0.58rem", letterSpacing: "0.24em", color: "#2d4050", marginBottom: "0.25rem" }}>NEW ALIAS</div>
+            <div style={{ fontSize: "0.65rem", letterSpacing: "0.2em", color: "#5a8070", marginBottom: "0.25rem" }}>NEW ALIAS</div>
             <div style={{ fontSize: "0.9rem", fontFamily: "var(--font-syne), sans-serif", fontWeight: 700, color: "#c8d4e0" }}>
               Create alias
             </div>
@@ -90,9 +90,9 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
           <button
             onClick={loading ? undefined : onClose}
             disabled={loading}
-            style={{ background: "none", border: "none", color: loading ? "#1a2a36" : "#2d4050", fontSize: "1rem", cursor: loading ? "not-allowed" : "pointer", transition: "color 0.15s" }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#c8d4e0"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
+            style={{ background: "none", border: "none", color: loading ? "#2d4050" : "#5a8070", fontSize: "1rem", cursor: loading ? "not-allowed" : "pointer", transition: "color 0.15s" }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.color = "#c8d4e0"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = loading ? "#2d4050" : "#5a8070"; }}
           >
             ✕
           </button>
@@ -100,7 +100,7 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
 
         <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
-            <div style={{ fontSize: "0.58rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.4rem" }}>
+            <div style={{ fontSize: "0.65rem", letterSpacing: "0.18em", color: "#5a8070", marginBottom: "0.4rem" }}>
               LABEL
             </div>
             <input
@@ -115,7 +115,7 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
           </div>
 
           <div>
-            <div style={{ fontSize: "0.58rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.4rem" }}>
+            <div style={{ fontSize: "0.65rem", letterSpacing: "0.18em", color: "#5a8070", marginBottom: "0.4rem" }}>
               CUSTOM PREFIX <span style={{ opacity: 0.5 }}>(OPTIONAL)</span>
             </div>
             <input
@@ -128,7 +128,7 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
               maxLength={32}
               pattern="[a-zA-Z0-9\-_]*"
             />
-            <div style={{ fontSize: "0.58rem", color: "#1a2a36", marginTop: "0.35rem", letterSpacing: "0.06em" }}>
+            <div style={{ fontSize: "0.65rem", color: "#4a7060", marginTop: "0.35rem", letterSpacing: "0.06em" }}>
               alphanumeric + hyphens · random suffix appended
             </div>
           </div>
@@ -146,11 +146,11 @@ export function CreateAliasModal({ cryptoKey, onClose }: Props) {
                 flex: 1, padding: "0.65rem",
                 background: "none",
                 border: "1px solid rgba(0,255,140,0.1)",
-                color: "#2d4050", fontSize: "0.65rem", letterSpacing: "0.1em",
+                color: "#5a8070", fontSize: "0.65rem", letterSpacing: "0.1em",
                 fontFamily: "inherit", cursor: "pointer", transition: "all 0.15s",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "#c8d4e0"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.25)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "#2d4050"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "#5a8070"; e.currentTarget.style.borderColor = "rgba(0,255,140,0.1)"; }}
             >
               CANCEL
             </button>

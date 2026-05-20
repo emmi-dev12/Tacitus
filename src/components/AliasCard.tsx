@@ -112,7 +112,7 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
         <div style={{
           marginBottom: "0.5rem", padding: "0.4rem 0.6rem",
           border: "1px solid rgba(255,180,0,0.2)", background: "rgba(255,180,0,0.05)",
-          fontSize: "0.6rem", lineHeight: 1.5, color: "#b08820",
+          fontSize: "0.68rem", lineHeight: 1.5, color: "#c8a040",
         }}>
           {deleteWarning}
         </div>
@@ -131,7 +131,7 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
       )}
 
       <div style={{ marginBottom: "0.5rem", paddingRight: unreadCount > 0 ? "1.5rem" : 0 }}>
-        <div style={{ fontSize: "0.58rem", letterSpacing: "0.14em", color: "#2d4050", marginBottom: "0.25rem" }}>
+        <div style={{ fontSize: "0.65rem", letterSpacing: "0.12em", color: "#5a8070", marginBottom: "0.25rem" }}>
           {alias.label}
         </div>
         <div style={{
@@ -145,16 +145,16 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
         <span style={{
-          fontSize: "0.56rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
-          color: isExpired ? "#ff4455" : "#2d4050",
-          border: `1px solid ${isExpired ? "rgba(255,68,85,0.25)" : "rgba(0,255,140,0.06)"}`,
+          fontSize: "0.63rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
+          color: isExpired ? "#ff6677" : "#5a8070",
+          border: `1px solid ${isExpired ? "rgba(255,68,85,0.3)" : "rgba(0,255,140,0.15)"}`,
         }}>
           {ttlStr}
         </span>
         <span style={{
-          fontSize: "0.56rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
-          color: alias.activeStatus ? "#00ff8c" : "#2d4050",
-          border: `1px solid ${alias.activeStatus ? "rgba(0,255,140,0.2)" : "rgba(0,255,140,0.06)"}`,
+          fontSize: "0.63rem", letterSpacing: "0.08em", padding: "0.15rem 0.4rem",
+          color: alias.activeStatus ? "#00ff8c" : "#5a8070",
+          border: `1px solid ${alias.activeStatus ? "rgba(0,255,140,0.25)" : "rgba(0,255,140,0.15)"}`,
         }}>
           {alias.activeStatus ? "active" : "paused"}
         </span>
@@ -176,13 +176,13 @@ export function AliasCard({ alias, unreadCount, selected, onSelect, cryptoKey }:
               style={{
                 background: danger ? "rgba(255,68,85,0.1)" : "none",
                 border: danger ? "1px solid rgba(255,68,85,0.25)" : "none",
-                color: danger ? "#ff6677" : "#2d4050",
-                fontSize: "0.58rem", fontFamily: "inherit", letterSpacing: "0.06em",
+                color: danger ? "#ff6677" : "#5a8070",
+                fontSize: "0.65rem", fontFamily: "inherit", letterSpacing: "0.06em",
                 padding: "0.2rem 0.4rem", cursor: "pointer",
                 transition: "color 0.1s",
               }}
               onMouseEnter={(e) => { if (!danger) e.currentTarget.style.color = "#c8d4e0"; }}
-              onMouseLeave={(e) => { if (!danger) e.currentTarget.style.color = "#2d4050"; }}
+              onMouseLeave={(e) => { if (!danger) e.currentTarget.style.color = "#5a8070"; }}
             >
               {label}
             </button>

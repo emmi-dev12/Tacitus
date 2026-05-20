@@ -118,7 +118,7 @@ export function MessageList({ messages, cryptoKey, onSelect, selectedId }: Props
     return (
       <div style={{
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "0.62rem", letterSpacing: "0.1em", color: "#1a2a36",
+        fontSize: "0.68rem", letterSpacing: "0.1em", color: "#4a7060",
         fontFamily: "var(--font-space-mono), monospace",
       }}>
         no messages
@@ -151,19 +151,19 @@ export function MessageList({ messages, cryptoKey, onSelect, selectedId }: Props
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.2rem" }}>
               <span style={{
                 fontSize: "0.68rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                color: raw.read ? "#2d4050" : "#c8d4e0",
+                color: raw.read ? "#5a8070" : "#c8d4e0",
                 fontWeight: raw.read ? 400 : 700,
                 flex: 1,
               }}>
                 {msg?.from ?? "···"}
               </span>
-              <span style={{ fontSize: "0.56rem", color: "#1a2a36", letterSpacing: "0.06em", flexShrink: 0 }}>
+              <span style={{ fontSize: "0.63rem", color: "#4a7060", letterSpacing: "0.06em", flexShrink: 0 }}>
                 {formatTime(raw.receivedAt)}
               </span>
             </div>
             <div style={{
               fontSize: "0.65rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              color: raw.read ? "#1a2a36" : "#4a6070",
+              color: raw.read ? "#4a7060" : "#8ab0c0",
             }}>
               {msg?.subject ?? "decrypting…"}
             </div>

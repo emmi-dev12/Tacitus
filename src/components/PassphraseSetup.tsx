@@ -27,7 +27,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d4050", marginBottom: "0.4rem",
+  fontSize: "0.65rem", letterSpacing: "0.2em", color: "#5a8070", marginBottom: "0.4rem",
 };
 
 export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
@@ -118,10 +118,10 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
       <div style={{ width: "100%", maxWidth: "440px" }}>
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
           <div style={{ fontSize: "1rem", fontWeight: 700, letterSpacing: "0.18em", color: "#00ff8c" }}>◈ TACITUS</div>
-          <div style={{ fontSize: "0.58rem", letterSpacing: "0.28em", color: "#2d4050", marginTop: "0.3rem" }}>DECRYPT SESSION</div>
+          <div style={{ fontSize: "0.65rem", letterSpacing: "0.24em", color: "#5a8070", marginTop: "0.3rem" }}>DECRYPT SESSION</div>
         </div>
         <div style={panel}>
-          <p style={{ fontSize: "0.72rem", lineHeight: 1.7, color: "#3a5060", marginBottom: "1.5rem", margin: "0 0 1.5rem" }}>
+          <p style={{ fontSize: "0.78rem", lineHeight: 1.7, color: "#8ab0c0", marginBottom: "1.5rem", margin: "0 0 1.5rem" }}>
             Enter your passphrase to decrypt your messages.
           </p>
 
@@ -163,11 +163,11 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
                 onClick={() => setShowRecovery(true)}
                 style={{
                   background: "none", border: "none", fontFamily: "inherit",
-                  fontSize: "0.62rem", letterSpacing: "0.08em", color: "#2d4050",
+                  fontSize: "0.68rem", letterSpacing: "0.08em", color: "#5a7a8a",
                   cursor: "pointer", transition: "color 0.15s",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
-                onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
+                onMouseEnter={(e) => e.currentTarget.style.color = "#c8d4e0"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "#5a7a8a"}
               >
                 use recovery code instead
               </button>
@@ -208,11 +208,11 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
                 onClick={() => { setShowRecovery(false); setRecoveryInput(""); }}
                 style={{
                   background: "none", border: "none", fontFamily: "inherit",
-                  fontSize: "0.62rem", letterSpacing: "0.08em", color: "#2d4050",
+                  fontSize: "0.68rem", letterSpacing: "0.08em", color: "#5a7a8a",
                   cursor: "pointer", transition: "color 0.15s",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
-                onMouseLeave={(e) => e.currentTarget.style.color = "#2d4050"}
+                onMouseEnter={(e) => e.currentTarget.style.color = "#c8d4e0"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "#5a7a8a"}
               >
                 ← back to passphrase
               </button>
@@ -230,11 +230,11 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
             }}
             style={{
               background: "none", border: "none", fontFamily: "inherit",
-              fontSize: "0.6rem", letterSpacing: "0.08em", color: "#1a2a36",
+              fontSize: "0.65rem", letterSpacing: "0.08em", color: "#4a7060",
               cursor: "pointer", transition: "color 0.15s",
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#1a2a36"}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#c8d4e0"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#4a7060"}
           >
             sign out and start over →
           </button>
