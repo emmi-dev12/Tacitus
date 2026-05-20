@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useRouter } from "next/navigation";
+import { clearKey } from "@/lib/keyStore";
 import { spaceMono, syne } from "@/app/landing-fonts";
 
+// UX-only rate limiter — not a security control. An attacker with DevTools can clear this.
+// The real rate limiter is the 600k-iteration PBKDF2 cost (~1–2s per attempt on modern hardware).
 const THROTTLE_KEY = "tacitus_unlock_throttle";
 
 interface Props {
@@ -26,6 +31,8 @@ const labelStyle: React.CSSProperties = {
 };
 
 export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
+  const { signOut } = useAuthActions();
+  const router = useRouter();
   const [passphrase, setPassphrase] = useState("");
   const [recoveryInput, setRecoveryInput] = useState("");
   const [showRecovery, setShowRecovery] = useState(false);
@@ -176,6 +183,7 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
                   onFocus={(e) => e.target.style.borderColor = "rgba(0,255,140,0.4)"}
                   onBlur={(e) => e.target.style.borderColor = "rgba(0,255,140,0.1)"}
                   placeholder="paste recovery code…"
+                  autoComplete="off"
                   rows={3}
                 />
               </div>
@@ -210,6 +218,26 @@ export function PassphraseSetup({ onUnlock, onRecovery }: Props) {
               </button>
             </form>
           )}
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+          <button
+            type="button"
+            onClick={async () => {
+              clearKey();
+              localStorage.removeItem(THROTTLE_KEY);
+              try { await signOut(); } finally { router.replace("/landing"); }
+            }}
+            style={{
+              background: "none", border: "none", fontFamily: "inherit",
+              fontSize: "0.6rem", letterSpacing: "0.08em", color: "#1a2a36",
+              cursor: "pointer", transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#4a6070"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#1a2a36"}
+          >
+            sign out and start over →
+          </button>
         </div>
       </div>
     </div>

@@ -1083,3 +1083,66 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 ---
 
 **Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain. Medium remainders: checkbox-only prerequisite verification in setup wizard (no backend probe); passphrase in auth page DOM after signup (pre-existing, noted).
+
+## Entry 017 — Passphrase unlock escape hatch + keychain save
+
+**Prompt:**
+> Hey, so I have a new issue.
+>
+> I am trying to go through the setup, but for some reason my Convex database was linked to it before and I don't have my passphrase. It is asking me to enter a passphrase that I don't have, and it's not working. I tried to start over, but it is still asking me for that passphrase.
+>
+> You have to fix that. Also, it should automatically save to whichever keychain is used.
+>
+> Does that make sense?
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| src/components/PassphraseSetup.tsx | Added "sign out and start over" button; clears throttle + in-memory key then calls signOut(); added UX-only throttle comment; added autoComplete="off" on recovery textarea |
+| src/app/auth/page.tsx | Reverted to autoComplete="off" on signin passphrase (encryption key must not go to browser/cloud credential store); removed non-functional hidden display:none password input |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| High | Sign-out handler didn't clear THROTTLE_KEY; throttle key not scoped per account |
+| High | Hidden `display:none` password input does nothing — browsers ignore it; causes React a11y warning |
+| High | `autoComplete="current-password"` on passphrase syncs the encryption key to browser/cloud credential store — threat model regression |
+| Medium | signOut() failure silently swallowed |
+| Medium | Recovery code path has no rate limiting |
+| Medium | setPendingPassphrase called before setProfile succeeds (pre-existing) |
+| Medium | logout() in useEncryptionKey.ts misleadingly named (doesn't invalidate Convex session) |
+| Medium | QR prefill + autoComplete interaction could save passphrase under empty username |
+| Low | Static lockout countdown message never updates in real-time |
+
+**Fixes applied:**
+- Reverted signin passphrase to `autoComplete="off"`
+- Removed the hidden password input
+- Sign-out handler now calls `localStorage.removeItem(THROTTLE_KEY)` before signOut()
+- Added comment clarifying throttle is UX-only (600k PBKDF2 is the real rate limiter)
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| Medium | Recovery code textarea missing `autoComplete="off"` — recovery code = full decryption access, same sensitivity as passphrase |
+
+**Fixes applied:**
+- Added `autoComplete="off"` to recovery textarea
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| — | No findings |
+
+---
+
+**Final verdict:** Security review clean after 3 rounds — no Critical or High issues remain. Remaining mediums: signOut() failure swallowed silently; recovery code path has no rate limiting; setPendingPassphrase/setProfile ordering (pre-existing); logout() naming in useEncryptionKey.ts.
