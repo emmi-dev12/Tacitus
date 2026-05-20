@@ -237,8 +237,8 @@ function StepDeploy({ onNext }: { onNext: () => void }) {
         ⚠ <strong style={{ color: "#e06060" }}>Security:</strong> Only clone from the official Tacitus repository below.
         Never run <code style={{ color: "#c8d4e0" }}>npm install</code> on code from an untrusted source.
       </div>
-      <Code>{`git clone https://github.com/emmi-dev12/GhostMail
-cd GhostMail
+      <Code>{`git clone https://github.com/emmi-dev12/Tacitus
+cd Tacitus
 npm install
 npx convex deploy --prod`}</Code>
       <Body>
