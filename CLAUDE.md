@@ -47,6 +47,18 @@ The Next.js app is a **fully static export** (`output: "export"` in `next.config
 - **`convex/`** — Convex backend (schema, mutations, queries, auth, nightly cleanup cron)
 - **`cli/`** — oclif + ink CLI; its own `package.json` and `tsconfig.json`; compiled separately; binary is `tac`
 
+### Route map
+
+```
+/           → redirects to /landing (configured) or /setup (not configured)
+/setup      → BYOD wizard; stores Convex URL in localStorage
+/landing    → marketing/entry page; links to /auth
+/auth       → sign-up / sign-in
+/inbox      → main app (requires auth + passphrase unlock)
+```
+
+`ClientProviders.tsx` reads `localStorage["tacitus_convex_url"]` on every load. If missing, any non-`/setup` / non-`/landing` route is redirected to `/setup`. Routes `/setup` and `/landing` render without a Convex provider (defined in `NO_CONVEX_ROUTES`).
+
 ### Authentication
 
 Auth uses `@convex-dev/auth` with the `Password` provider. Users authenticate with a **username + passphrase only** — no separate password. The auto-generated passphrase (5 words from a 256-word list, `src/lib/wordlist.ts`) serves as both the Convex Auth credential and the PBKDF2 key derivation input. `convex/auth.ts` converts the username to a synthetic `username@tacitus.local` email internally. Username rules: 3–32 chars, `^[a-z0-9_-]+$` only.
@@ -60,6 +72,10 @@ Auth uses `@convex-dev/auth` with the `Password` provider. Users authenticate wi
 5. `useMailPoller` (15s interval, exponential backoff) polls [mail.tm](https://mail.tm) for new messages on each alias
 6. Each message is encrypted with `AES-256-GCM` via `encryptMessage` — **each field gets its own random 12-byte IV** — and stored in Convex
 7. The inbox decrypts lazily in the browser; the `CryptoKey` is cleared on page reload
+
+### Encryption key lifecycle (`useEncryptionKey` hook)
+
+`KeyStatus` has three states: `"loading"` → `"needs_unlock"` → `"unlocked"`. The hook is the single gatekeeper for all crypto operations in the inbox. On mount it checks `keyStore.ts` (in-memory); if missing, it checks `pendingPassphrase.ts` (bridged from signup); otherwise shows `PassphraseSetup`. The key never touches `localStorage` or `sessionStorage`.
 
 ### Provider architecture
 
@@ -84,7 +100,7 @@ On signup the success screen shows a QR code encoding `origin/auth#u=USERNAME&p=
 
 ### BYOD setup wizard (`/setup`)
 
-First-time users who deploy their own Convex backend go through a 5-step wizard (`src/app/setup/`). It collects the Convex deployment URL, walks through `convex deploy` + auth provisioning steps, then stores the URL in `localStorage` via `src/lib/convexConfig.ts`. The stored URL is validated on every read: must be `https://` and match `*.convex.cloud` — rejects custom domains. `ClientProviders.tsx` reads this value to instantiate `ConvexReactClient`; missing or invalid URL redirects to `/setup`.
+First-time users who deploy their own Convex backend go through a 5-step wizard (`src/app/setup/`). It uses a "Deploy to Convex" button (template URL) instead of CLI commands, generates `AUTH_SECRET` in the browser via `crypto.getRandomValues`, then stores the deployment URL in `localStorage` via `src/lib/convexConfig.ts`. The stored URL is validated on every read: must be `https://` and match `*.convex.cloud`. `storeConvexUrl` validates and overwrites atomically — no separate clear needed before storing a replacement.
 
 ### CLI credentials (`cli/src/lib/config.ts`)
 
@@ -92,11 +108,33 @@ Convex URL + auth token stored in the system keychain via `keytar`; falls back t
 
 ### Security boundaries
 
-- `MessageViewer.tsx` renders HTML email in a sandboxed iframe — no `allow-same-origin`, no `allow-scripts`
+- `MessageViewer.tsx` renders HTML email in a sandboxed iframe — `sandbox=""` with no flags (no `allow-same-origin`, no `allow-scripts`)
 - `src/lib/sanitize.ts` — strict `sanitize-html` allowlist; `allowedSchemes` is empty globally, explicit per tag
-- `next.config.ts` — CSP, HSTS, X-Frame-Options headers
+- Security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy) live in `public/_headers` — this is a Render static site, so `next.config.ts` headers are ignored; `public/_headers` is the authoritative source
 - `convex/aliases.ts` — 10 alias/hour rate limit; RFC-5321 address regex; ASCII-only labels
 - `convex/cleanup.ts` — nightly cron deletes expired aliases using `by_expiresAt` index
+
+### localStorage keys
+
+| Key | Owner | Purpose |
+|-----|-------|---------|
+| `tacitus_convex_url` | `src/lib/convexConfig.ts` | Stores validated Convex deployment URL |
+| `tacitus_unlock_throttle` | `src/components/PassphraseSetup.tsx` | UX-only unlock attempt counter (not a security control) |
+| `pwa-ios-dismissed` | `src/components/PwaInstallPrompt.tsx` | Suppresses iOS PWA install prompt |
+
+`sessionStorage["tacitus_setup_auth_secret"]` holds the wizard-generated `AUTH_SECRET` only during the `/setup` flow; cleared on wizard completion.
+
+### UI color palette
+
+All inline styles use a consistent dark-terminal palette. Readable text values:
+- Primary text: `#c8d4e0`
+- Secondary/labels: `#5a8070`
+- Tertiary/hints: `#4a7060`
+- Body copy: `#8ab0c0`
+- Accent: `#00ff8c`
+- Background: `#080d14`
+
+Never use `#2d4050`, `#1a2a36`, or `#3a5060` for readable text — these are near-invisible on the dark background (contrast < 2.5:1).
 
 ### PWA
 
