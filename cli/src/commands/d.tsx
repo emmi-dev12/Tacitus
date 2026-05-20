@@ -85,7 +85,7 @@ function DeleteUI({ aliasId }: { aliasId?: string }) {
   return (
     <Box flexDirection="column" gap={1}>
       <Box borderStyle="round" borderColor="red" paddingX={1}>
-        <Text color="red" bold>GhostMail — Delete Alias</Text>
+        <Text color="red" bold>Tacitus — Delete Alias</Text>
         <Text color="gray">  ↑↓ select · Enter confirm · q quit</Text>
       </Box>
       {aliases.map((a, i) => (

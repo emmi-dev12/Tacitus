@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { ClientProviders } from "../ClientProviders";
 
+// Server Component — ClientProviders is provided by the root layout.
 export default function AuthLayout({ children }: { children: ReactNode }) {
-  return <ClientProviders>{children}</ClientProviders>;
+  return <>{children}</>;
 }

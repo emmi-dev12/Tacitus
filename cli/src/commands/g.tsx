@@ -4,43 +4,57 @@ import { render, Box, Text, useInput, useApp } from "ink";
 import TextInput from "ink-text-input";
 import { getClient } from "../lib/convex.js";
 import { loadConfig } from "../lib/config.js";
-import { deriveKey, encrypt } from "../lib/crypto.js";
+import { deriveKey, encrypt, verifySentinel } from "../lib/crypto.js";
 
-// Inline the mail.tm API call (no browser deps)
-async function generateMailTmAlias(prefix?: string): Promise<{ address: string; accountId: string; token: string; password: string }> {
-  const domainsRes = await fetch("https://api.mail.tm/domains", {
-    headers: { Accept: "application/json" },
+async function mailtmFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(`https://api.mail.tm${path}`, {
+    ...opts,
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...(opts.headers ?? {}) },
   });
-  const domains = await domainsRes.json() as { "hydra:member": Array<{ domain: string; isActive: boolean }> };
-  const active = domains["hydra:member"].filter((d: { isActive: boolean }) => d.isActive);
-  if (!active.length) throw new Error("No active mail.tm domains");
-  const randBytes = crypto.getRandomValues(new Uint8Array(9));
-  const domain = active[randBytes[0] % active.length];
+  if (!res.ok) throw new Error(`mail.tm ${path} → ${res.status}`);
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > 5 * 1024 * 1024) throw new Error("mail.tm response too large");
+  return JSON.parse(new TextDecoder().decode(buf)) as T;
+}
 
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+const DOMAIN_RE = /^[a-z0-9][a-z0-9.\-]{1,253}\.[a-z]{2,}$/i;
+
+async function generateMailTmAlias(prefix?: string): Promise<{ address: string; accountId: string; token: string; password: string }> {
+  const domains = await mailtmFetch<{ "hydra:member": Array<{ domain: string; isActive: boolean }> }>("/domains");
+  const active = domains["hydra:member"].filter(
+    (d: { domain: string; isActive: boolean }) =>
+      d.isActive && typeof d.domain === "string" && DOMAIN_RE.test(d.domain),
+  );
+  if (!active.length) throw new Error("No active mail.tm domains");
+
+  const randBytes = crypto.getRandomValues(new Uint8Array(17));
+  // Rejection sampling — eliminates modulo bias in domain selection
+  const domainCount = active.length;
+  const threshold = 256 - (256 % domainCount);
+  let domainByte = randBytes[0];
+  while (domainByte >= threshold) {
+    domainByte = crypto.getRandomValues(new Uint8Array(1))[0];
+  }
+  const domain = active[domainByte % domainCount];
+
+  // 32-char base32 alphabet: 256 % 32 === 0 — no modulo bias; 16 bytes = 80-bit entropy
+  const chars = "abcdefghijklmnopqrstuvwxyz234567";
   const rand = Array.from(randBytes.slice(1), (b: number) => chars[b % chars.length]).join("");
   const local = prefix ? `${prefix.toLowerCase().replace(/[^a-z0-9]/g, "")}-${rand}` : rand;
   const address = `${local}@${domain.domain}`;
 
   const password = Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("hex");
 
-  await fetch("https://api.mail.tm/accounts", {
+  await mailtmFetch("/accounts", { method: "POST", body: JSON.stringify({ address, password }) });
+
+  const { token } = await mailtmFetch<{ token: string }>("/token", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ address, password }),
   });
 
-  const tokenRes = await fetch("https://api.mail.tm/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ address, password }),
+  const { id } = await mailtmFetch<{ id: string }>("/me", {
+    headers: { Authorization: `Bearer ${token}` },
   });
-  const { token } = await tokenRes.json() as { token: string };
-
-  const meRes = await fetch("https://api.mail.tm/me", {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  });
-  const { id } = await meRes.json() as { id: string };
 
   return { address, accountId: id, token, password };
 }
@@ -62,13 +76,20 @@ function CreateAliasUI() {
     setStep("creating");
     try {
       const config = await loadConfig();
-      if (!config) throw new Error("Not logged in. Run: ghost login");
+      if (!config) throw new Error("Not logged in. Run: tac login");
 
       const client = await getClient();
-      const saltRes = await client.query("users:getSalt", {});
-      if (!saltRes) throw new Error("No encryption salt found. Set up via web UI first.");
+      const profile = await client.query("users:getProfile", {}) as {
+        pbkdf2Salt: string;
+        encryptedSentinel: string;
+        sentinelIv: string;
+      } | null;
+      if (!profile) throw new Error("No encryption profile found. Set up via web UI first.");
 
-      const key = await deriveKey(pp, saltRes as string);
+      const key = await deriveKey(pp, profile.pbkdf2Salt);
+      if (!verifySentinel(profile.encryptedSentinel, profile.sentinelIv, key)) {
+        throw new Error("Incorrect passphrase");
+      }
       const { address, accountId, token, password } = await generateMailTmAlias(prefix || undefined);
       const encToken = encrypt(token, key);
       const encPassword = encrypt(password, key);
@@ -94,7 +115,7 @@ function CreateAliasUI() {
   if (step === "label") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail — New Alias</Text>
+        <Text color="green">◆ Tacitus — New Alias</Text>
         <Box>
           <Text color="gray">Label: </Text>
           <TextInput
@@ -112,7 +133,7 @@ function CreateAliasUI() {
   if (step === "prefix") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail — New Alias</Text>
+        <Text color="green">◆ Tacitus — New Alias</Text>
         <Text>Label: <Text color="white">{label || "(auto)"}</Text></Text>
         <Box>
           <Text color="gray">Custom prefix (optional): </Text>
@@ -130,7 +151,7 @@ function CreateAliasUI() {
   if (step === "passphrase") {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="green">◆ GhostMail — New Alias</Text>
+        <Text color="green">◆ Tacitus — New Alias</Text>
         <Box>
           <Text color="gray">Encryption passphrase: </Text>
           <TextInput

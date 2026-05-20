@@ -106,7 +106,7 @@ export default function InboxPage() {
   const { signOut } = useAuthActions();
   const router = useRouter();
 
-  const { status, setup, unlock, unlockWithRecovery, getKey, logout } = useEncryptionKey(isAuthenticated);
+  const { status, unlock, unlockWithRecovery, getKey, logout } = useEncryptionKey(isAuthenticated);
 
   // Only fetch data once fully authenticated and passphrase-unlocked.
   // Passing "skip" before that point ensures zero Convex traffic while unauthenticated.
@@ -145,12 +145,8 @@ export default function InboxPage() {
 
   if (authLoading || status === "loading" || !isAuthenticated) return <Spinner />
 
-  if (status === "needs_setup") {
-    return <PassphraseSetup mode="setup" onSetup={setup} />;
-  }
-
   if (status === "needs_unlock") {
-    return <PassphraseSetup mode="unlock" onUnlock={unlock} onRecovery={unlockWithRecovery} />;
+    return <PassphraseSetup onUnlock={unlock} onRecovery={unlockWithRecovery} />;
   }
 
   const cryptoKey = getKey()!;

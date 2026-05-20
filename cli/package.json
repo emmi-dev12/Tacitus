@@ -1,9 +1,12 @@
 {
-  "name": "ghostmail-cli",
+  "name": "tacitus-cli",
   "version": "0.1.0",
-  "description": "GhostMail CLI — disposable email from your terminal",
+  "description": "Tacitus CLI — silent disposable email from your terminal",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "bin": {
-    "ghost": "./bin/run.js"
+    "tac": "./bin/run.js"
   },
   "main": "dist/index.js",
   "type": "module",
@@ -25,8 +28,8 @@
     "typescript": "^5.6.0"
   },
   "oclif": {
-    "bin": "ghost",
-    "dirname": "ghostmail",
+    "bin": "tac",
+    "dirname": "tacitus",
     "commands": "./src/commands",
     "plugins": []
   }

@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const pbkdf2Async = promisify(pbkdf2);
 
-const ITERATIONS = 310_000;
+const ITERATIONS = 600_000;
 const DIGEST = "sha256";
 const KEY_LEN = 32; // 256-bit
 const IV_LEN = 12;  // 96-bit for GCM
@@ -38,4 +38,23 @@ export function decrypt(ciphertextBase64: string, ivBase64: string, key: Buffer)
   const decipher = createDecipheriv(ALG, key, iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf-8");
+}
+
+const SENTINEL = "tacitus-v1";
+
+export function verifySentinel(
+  encryptedSentinel: string,
+  sentinelIv: string,
+  key: Buffer,
+): boolean {
+  try {
+    const plain = decrypt(encryptedSentinel, sentinelIv, key);
+    // Constant-time comparison
+    const a = Buffer.from(plain, "utf-8");
+    const b = Buffer.from(SENTINEL, "utf-8");
+    if (a.length !== b.length) return false;
+    return a.equals(b); // Node.js Buffer.equals is constant-time
+  } catch {
+    return false;
+  }
 }

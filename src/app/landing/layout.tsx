@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { ClientProviders } from "../ClientProviders";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
+// Server Component — ClientProviders is provided by the root layout.
 export default function LandingLayout({ children }: { children: ReactNode }) {
   return (
-    <ClientProviders>
+    <>
       {children}
       <PwaInstallPrompt />
-    </ClientProviders>
+    </>
   );
 }

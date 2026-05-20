@@ -826,3 +826,260 @@ Installed at `~/.claude/skills/tacitus-review/SKILL.md`. Auto-activates on any T
 ---
 
 **Final verdict:** Security review clean after 4 rounds — no Critical or High issues remain.
+
+## Entry 014 — Fix "This page couldn't load" crash after account creation
+
+**Prompt:**
+> got this error after creating account.
+> 
+> This page couldn't load
+> Reload to try again, or go back.
+> 
+> Reload
+> Back
+
+**Root cause:** After signup, navigating from `/auth` to `/inbox` unmounted the `/auth` route's `ClientProviders` (which included `ConvexClientProvider`). The `useEffect` cleanup called `client.close()`, but `ConvexAuthProvider` still held a reference and called `clearAuth` on the already-closed client asynchronously — `Uncaught Error: ConvexReactClient has already been closed` — crashing the page. Each of the three route layouts (`/auth`, `/inbox`, `/landing`) had its own `ClientProviders`, creating a fresh Convex client + WebSocket on every navigation.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/app/layout.tsx` | Added `ClientProviders` wrap — single Convex client for entire app lifecycle |
+| `src/app/auth/layout.tsx` | Removed `ClientProviders`; now just renders children |
+| `src/app/inbox/layout.tsx` | Removed `ClientProviders`; now just renders children |
+| `src/app/landing/layout.tsx` | Removed `ClientProviders`; now just renders children + PwaInstallPrompt |
+| `src/app/ConvexClientProvider.tsx` | Restored `client.close()` cleanup (safe at root level); extracted to shared error module; fixed misleading catch message; dropped `wss:` acceptance |
+| `src/app/ClientProviders.tsx` | Imports from shared error module; production-safe console logging; removed stale comments |
+| `src/app/convexErrorMessages.ts` | New — shared `SAFE_MESSAGES` set and `safeMessage()` function; eliminates circular import and drift risk |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | `auth/`, `inbox/`, AND `landing/` layouts each mount their own `ClientProviders` — new Convex client + WebSocket per navigation; leaked sockets after `close()` removal; root cause of the original crash |
+| High | No cleanup path after `close()` removal — permanent WebSocket leak on HMR and any future unmount |
+| High | `ErrorBoundary` never resets on navigation — traps subsequent valid renders in error state |
+| High | `makeConvexClient()` throws in render phase; raw third-party errors propagate before `safeMessage()` filtering |
+| Medium | Accepting `wss:` widens input surface with no documentation or test coverage |
+| Medium | Full `error` + `componentStack` logged to console in production |
+| Low | Hardcoded `#0F172A` in loading fallback |
+| Low | Sub-layouts lack `"use client"` or explanatory comment |
+
+**Fixes applied:**
+- Hoisted `ClientProviders` to root `layout.tsx`; stripped it from all three sub-layouts
+- Restored `client.close()` in `useEffect` cleanup (now safe at root level)
+- Wrapped `makeConvexClient()` errors; dropped `wss:` — `https:` only
+- Added production-safe console logging (dev logs full error+info; prod logs safeMessage only)
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| Critical | `landing/layout.tsx` still wrapped `ClientProviders` — missed in round 1 fixes |
+| High | `makeConvexClient()` in render body; Strict Mode double-invoke with side effects |
+| Medium | `SAFE_URL_ERRORS`/`SAFE_MESSAGES` duplicated in two files — silent drift risk |
+| Medium | Malformed URL mis-reported as "must use HTTPS" |
+| Medium | `ResettingErrorBoundary` with pathname key causes ConvexClientProvider remount on every navigation at root level — defeats the entire fix |
+
+**Fixes applied:**
+- Removed `ClientProviders` from `landing/layout.tsx`
+- Removed `ResettingErrorBoundary` (counterproductive at root)
+- Fixed misleading URL error message (separate "not a valid URL" message)
+- Exported `SAFE_MESSAGES`/`safeMessage` from `ClientProviders` to reduce drift
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| Medium | Circular import: `ClientProviders → ConvexClientProvider → ClientProviders` — load-order-dependent, breaks on restructure |
+| Low-Medium | Constructor catch re-throws misleading HTTPS error for non-URL `ConvexReactClient` failures |
+| Low | `PwaInstallPrompt` in Server Component layout — verify `"use client"` (confirmed present) |
+| Low | Infinite "Initializing…" with no timeout escalation |
+| Info | Stale comment references removed constant |
+
+**Fixes applied:**
+- Extracted `SAFE_MESSAGES`/`safeMessage` to `src/app/convexErrorMessages.ts` — circular import eliminated
+- Both provider files now import from shared module
+- Fixed constructor catch to use neutral generic message instead of HTTPS message
+
+---
+
+### Reviewer Round 4
+
+| Severity | Finding |
+|----------|---------|
+| Low | Safe-message allowlist strings not compile-time enforced — drift breaks graceful degradation silently |
+| Low/Info | No hostname validation beyond `https:` protocol check (build-pipeline integrity concern, not runtime) |
+| — | No Critical or High findings |
+
+---
+
+**Final verdict:** Security review clean after 4 rounds — no Critical or High issues remain.
+
+## Entry 015 — Auth UX overhaul: username+passphrase only, auto-gen, QR cross-device
+
+**Prompt:**
+> okay, now first of all the passphrase should be auto-generated and also why do i have to put in my password and the passphrase? either the passphrase either i just have a username and then the passphrase or i have a username and password and then maybe we should have a way that i can share my passphrase with other devices that i can also use it on other devices like maybe a phone or a tablet also makes sense
+
+**Design decisions:**
+- Auth model: username + passphrase only (passphrase = Convex Auth password AND PBKDF2 key derivation input)
+- Passphrase: auto-generated 5 words from 256-word list (2^40 ≈ 40 bits entropy)
+- Cross-device: QR code on signup encodes `origin/auth#u=USER&p=PASS` (fragment, never sent to server); scanning pre-fills signin form
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/lib/wordlist.ts` | New — 256-word curated list, `generatePassphrase(5)` using crypto.getRandomValues |
+| `src/lib/pendingPassphrase.ts` | New — in-memory bridge carries passphrase from signin to inbox for auto-unlock; 10s TTL with timer reset on double-call |
+| `src/app/auth/page.tsx` | Rewrite — signup shows auto-gen passphrase + QR code + recovery code; signin reads #fragment params; no password field |
+| `src/hooks/useEncryptionKey.ts` | Removed setup mode (handled at auth time); added auto-unlock via consumePendingPassphrase |
+| `src/components/PassphraseSetup.tsx` | Simplified to unlock-only; removed setup mode |
+| `src/app/inbox/page.tsx` | Removed needs_setup branch |
+| `src/lib/crypto.ts` | Added exportKeyAsRecoveryCode call path from auth page |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | 32-bit passphrase entropy (256^4) — insufficient for both auth and key derivation |
+| Critical | QR code uses `?p=` query param — appears in server access logs |
+| High | No server-side rate limiting on Convex auth endpoint |
+| High | Wordlist has 330 entries but Uint8Array only reaches indices 0–255; 74 words unreachable |
+| High | pendingPassphrase module variable exposed to XSS without TTL |
+| Medium | Recovery code (exportKeyAsRecoveryCode) not called from any UI — dead end |
+| Medium | QR code URL with passphrase computed eagerly, no expiry |
+| Medium | setProfile called before setKey; partial signup if setProfile throws |
+
+**Fixes applied:**
+- Wordlist trimmed to exactly 256 entries; passphrase increased to 5 words (2^40)
+- QR URL switched to URL fragment (#u=USER&p=PASS) — not sent to server
+- SigninView reads from window.location.hash and clears via history.replaceState
+- Recovery code (exportKeyAsRecoveryCode) now generated on signup, shown on success screen
+- autoComplete="off" on passphrase fields
+- pendingPassphrase auto-clears after 10 seconds via setTimeout
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| Critical | Wordlist had 230 entries (not 256) — runtime guard throws, app fails to load |
+| Medium | Recovery code = operational key; UI did not warn users of equal privilege |
+| Medium | Fragment credentials pre-fill form state; cleartext persists longer than address-bar clear |
+| Medium | QR scanner apps may log scanned URLs; "never sent to server" claim partially misleading |
+| Medium | Client-side throttle in localStorage is XSS-erasable |
+| Low | Double PBKDF2 at 600k iterations on signup hot path — blocking on mobile |
+| Low | pendingPassphrase timer not reset on double-call |
+
+**Fixes applied:**
+- Wordlist rewritten to exactly 256 entries (verified by script: 256 unique words)
+- Recovery code warning updated: "Anyone with this code can decrypt all your messages"
+- Both PBKDF2 derivations now run in parallel on signup (Promise.all)
+- pendingPassphrase double-call timer fixed with clearTimeout on re-entry
+
+---
+
+### Reviewer Round 3
+
+| Severity | Finding |
+|----------|---------|
+| High | Signup never calls setPendingPassphrase — orphaned state if setProfile throws after signIn |
+| High | importKeyFromRecoveryCode extractability unverified (confirmed: extractable:false on line 83) |
+| Medium | Fragment credentials held in React state after replaceState clears URL |
+| Medium | QR state holds plaintext passphrase for lifetime of SuccessScreen |
+| Low | 5-word passphrase (40 bits) lower than BIP-39 posture; 6 words = 48 bits considered |
+
+**Fixes applied:**
+- Signup now calls setPendingPassphrase immediately after signIn() succeeds, before PBKDF2
+- importKeyFromRecoveryCode confirmed non-extractable (crypto.ts:83)
+
+---
+
+### Reviewer Round 4
+
+| Severity | Finding |
+|----------|---------|
+| Medium | Parallel PBKDF2 blocks main thread; tab backgrounded mid-derivation on slow device could orphan account |
+| Medium | Catch-all error on signup swallows setProfile failure; shows misleading "username taken" message |
+| Low | QR fragment visible in address bar until component mounts on receiving device |
+| — | No Critical or High findings |
+
+---
+
+**Final verdict:** Security review clean after 4 rounds — no Critical or High issues remain.
+
+## Entry 016 — BYOD Convex setup wizard + ConvexClientProvider error fix
+
+**Prompt:**
+> Uncaught Error: ConvexReactClient has already been closed.
+> [stack trace]
+>
+> landing is at /landing. on the byod, that is correct. make sure it is really secure. this also means we can easily swap out or switch the db
+>
+> okay, so firstly i got an error. i'll paste that in and then also so when i'm logging in or creating the counter however u want to put it. there should be that should be at /setup or /login/signup however u want to do it and then also everybody should bring their own convex db so that nothing is linked to anything else. so they bring their own convex db and secrets and everything like that and they plug it in during the setup and it's guided we babysit them through the whole setup etc. okay? so do that pls and then yeah do u understand? everything should be at slugs. and then the landing page should be at slugs. thx
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `src/lib/convexConfig.ts` | New — localStorage get/set/clear for BYOD Convex URL; enforces `*.convex.cloud` domain |
+| `src/app/ConvexClientProvider.tsx` | Accepts `url` prop instead of env var; removed cleanup effect that caused "already closed" error; URL-change recreation moved to useEffect; defense-in-depth `.convex.cloud` check in makeConvexClient |
+| `src/app/ClientProviders.tsx` | Reads URL from localStorage; conditionally skips Convex provider on `/setup` and `/landing`; redirect to `/setup` moved to useEffect (not render body) |
+| `src/app/landing/AuthRedirect.tsx` | Inner-component pattern + useState/useEffect for config check — fixes SSR hydration mismatch |
+| `src/app/page.tsx` | Root redirect: `/setup` if no config, `/landing` if configured |
+| `src/app/setup/page.tsx` | New — 5-step guided BYOD setup wizard (welcome → Convex account → deploy → auth secret → URL entry) |
+| `src/app/setup/layout.tsx` | New — minimal layout for setup route |
+
+---
+
+### Reviewer Round 1
+
+| Severity | Finding |
+|----------|---------|
+| Critical | `convexConfig.ts` — no domain allowlisting; arbitrary `https://` URL accepted, enables attacker-controlled backend |
+| High | `setup/page.tsx` — instructs user to clone and `npm install` a placeholder repo URL — supply chain attack surface |
+| High | `AuthRedirect.tsx` — SSR/hydration mismatch on `typeof window` check; crashes or misrenders |
+| High | `ClientProviders.tsx` — `window.location.replace()` called during render, not in useEffect — React violation, potential infinite loop |
+| Medium | `ConvexClientProvider.tsx` — client recreated and old client closed during render |
+| Medium | `setup/page.tsx` — placeholder `YOUR_USERNAME` in clone URL ships to production |
+| Medium | `setup/page.tsx` — no actual verification of prerequisites |
+| Medium | `auth/page.tsx` — passphrase in component state/DOM after signup, no timeout |
+| Medium | CSRF amplifier — XSS can silently replace Convex URL combined with no domain allowlisting |
+| Low | Various (misleading comments, async handleSave wrapping sync call, etc.) |
+
+**Fixes applied:**
+- `convexConfig.ts`: `endsWith(".convex.cloud")` enforcement before storing URL
+- `setup/page.tsx`: replaced `YOUR_USERNAME` placeholder with real repo URL; added red security warning about only cloning from verified source
+- `AuthRedirect.tsx`: replaced `typeof window` guard with `useState<boolean | null>(null)` + `useEffect` pattern
+- `ClientProviders.tsx`: moved `window.location.replace("/setup")` into `useEffect`
+- `ConvexClientProvider.tsx`: added comment; URL-change client recreation already in useEffect
+- `setup/page.tsx`: removed `async` from `handleSave` (was wrapping synchronous call)
+
+---
+
+### Reviewer Round 2
+
+| Severity | Finding |
+|----------|---------|
+| High | `ConvexClientProvider.tsx` — null-guard init in render body misidentified as a Strict Mode WebSocket leak (see note) |
+| Medium | `makeConvexClient` does not re-enforce `.convex.cloud` — defense-in-depth gap |
+| Medium | Setup wizard checkbox steps provide no backend verification |
+| Low | `AuthRedirect` collapses `null`/`false` — cosmetically non-obvious but correct |
+
+**Fixes applied:**
+- `ConvexClientProvider.tsx`: added explanatory comment — the `null` guard in render IS the React-recommended lazy ref initialization pattern; refs persist across Strict Mode remounts so no duplicate WebSocket connections occur. Reviewer's High finding was incorrect; addressed with documentation.
+- `ConvexClientProvider.tsx`: added `*.convex.cloud` check inside `makeConvexClient` as defense-in-depth (R2-1)
+
+---
+
+**Final verdict:** Security review clean after 2 rounds — no Critical or High issues remain. Medium remainders: checkbox-only prerequisite verification in setup wizard (no backend probe); passphrase in auth page DOM after signup (pre-existing, noted).

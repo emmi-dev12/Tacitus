@@ -1,72 +1,57 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   deriveKey,
-  generateSalt,
-  exportKeyAsRecoveryCode,
   importKeyFromRecoveryCode,
-  createSentinel,
   verifySentinel,
 } from "@/lib/crypto";
 import { setKey, getKey, clearKey, hasKey } from "@/lib/keyStore";
+import { consumePendingPassphrase } from "@/lib/pendingPassphrase";
 
-export type KeyStatus = "loading" | "needs_setup" | "needs_unlock" | "unlocked";
+export type KeyStatus = "loading" | "needs_unlock" | "unlocked";
 
-// isAuthenticated: pass useConvexAuth().isAuthenticated from the caller.
-// Skips the Convex profile query until Convex auth is confirmed client-side,
-// preventing an unauthenticated round-trip during hydration.
 export function useEncryptionKey(isAuthenticated: boolean = false) {
   const [status, setStatus] = useState<KeyStatus>("loading");
   const [error, setError] = useState<string | null>(null);
 
   const profile = useQuery(api.users.getProfile, isAuthenticated ? undefined : "skip");
-  const setProfileMutation = useMutation(api.users.setProfile);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     if (profile === undefined) return; // still loading
     if (hasKey()) { setStatus("unlocked"); return; }
-    if (profile === null) {
-      setStatus("needs_setup");
-    } else {
-      setStatus("needs_unlock");
-    }
+    setStatus("needs_unlock");
   }, [profile, isAuthenticated]);
 
-  const setup = useCallback(
-    async (passphrase: string): Promise<string> => {
-      const salt = generateSalt();
-      const key = await deriveKey(passphrase, salt);
-      const sentinel = await createSentinel(key);
-      const recoveryCode = await exportKeyAsRecoveryCode(passphrase, salt);
-
-      await setProfileMutation({
-        pbkdf2Salt: salt,
-        encryptedSentinel: sentinel.encryptedSentinel,
-        sentinelIv: sentinel.sentinelIv,
-      });
-
-      setKey(key);
-      setStatus("unlocked");
-      return recoveryCode;
-    },
-    [setProfileMutation],
-  );
+  // Auto-unlock with passphrase carried from the sign-in navigation
+  useEffect(() => {
+    if (status !== "needs_unlock" || !profile) return;
+    const pending = consumePendingPassphrase();
+    if (!pending) return;
+    deriveKey(pending, profile.pbkdf2Salt)
+      .then((key) =>
+        verifySentinel(
+          { encryptedSentinel: profile.encryptedSentinel, sentinelIv: profile.sentinelIv },
+          key,
+        ).then((valid) => {
+          if (valid) { setKey(key); setStatus("unlocked"); }
+        })
+      )
+      .catch(() => { /* fall through to manual unlock screen */ });
+  }, [status, profile]);
 
   const unlock = useCallback(
     async (passphrase: string): Promise<void> => {
       if (!profile) throw new Error("No profile found");
       const key = await deriveKey(passphrase, profile.pbkdf2Salt);
-
       const valid = await verifySentinel(
         { encryptedSentinel: profile.encryptedSentinel, sentinelIv: profile.sentinelIv },
         key,
       );
       if (!valid) throw new Error("Incorrect passphrase");
-
       setKey(key);
       setStatus("unlocked");
       setError(null);
@@ -77,13 +62,11 @@ export function useEncryptionKey(isAuthenticated: boolean = false) {
   const unlockWithRecovery = useCallback(async (recoveryCode: string): Promise<void> => {
     const key = await importKeyFromRecoveryCode(recoveryCode);
     if (!profile) throw new Error("No profile found");
-
     const valid = await verifySentinel(
       { encryptedSentinel: profile.encryptedSentinel, sentinelIv: profile.sentinelIv },
       key,
     );
     if (!valid) throw new Error("Recovery code does not match this account");
-
     setKey(key);
     setStatus("unlocked");
     setError(null);
@@ -100,5 +83,5 @@ export function useEncryptionKey(isAuthenticated: boolean = false) {
     setStatus("needs_unlock");
   }, []);
 
-  return { status, error, setup, unlock, unlockWithRecovery, getKey: getKeyOrThrow, logout };
+  return { status, error, unlock, unlockWithRecovery, getKey: getKeyOrThrow, logout };
 }

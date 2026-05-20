@@ -4,7 +4,7 @@ import { render, Box, Text, useInput, useApp } from "ink";
 import TextInput from "ink-text-input";
 import { getClient } from "../lib/convex.js";
 import { loadConfig } from "../lib/config.js";
-import { deriveKey, decrypt } from "../lib/crypto.js";
+import { deriveKey, decrypt, verifySentinel } from "../lib/crypto.js";
 
 interface Alias {
   _id: string;
@@ -37,6 +37,9 @@ interface DecMsg {
   read: boolean;
 }
 
+const BIDI_RE = /[‎‏‪-‮⁦-⁩؜]/g;
+function stripBidi(s: string): string { return s.replace(BIDI_RE, ""); }
+
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleString();
 }
@@ -56,9 +59,16 @@ function BrowserUI({ passphrase }: { passphrase: string }) {
     const init = async () => {
       try {
         const client = await getClient();
-        const saltRes = await client.query("users:getSalt", {});
-        if (!saltRes) throw new Error("No salt — set up passphrase in web UI");
-        const derivedKey = await deriveKey(passphrase, saltRes as string);
+        const profile = await client.query("users:getProfile", {}) as {
+          pbkdf2Salt: string;
+          encryptedSentinel: string;
+          sentinelIv: string;
+        } | null;
+        if (!profile) throw new Error("No profile — set up passphrase in web UI");
+        const derivedKey = await deriveKey(passphrase, profile.pbkdf2Salt);
+        if (!verifySentinel(profile.encryptedSentinel, profile.sentinelIv, derivedKey)) {
+          throw new Error("Incorrect passphrase");
+        }
         setKey(derivedKey);
         const data = await client.query("aliases:listAliases", {});
         setAliases((data as Alias[]) ?? []);
@@ -84,9 +94,10 @@ function BrowserUI({ passphrase }: { passphrase: string }) {
       const decrypted: DecMsg[] = [];
       for (const m of msgs) {
         try {
-          const from = decrypt(m.encryptedFrom, m.ivFrom, key!);
-          const subject = decrypt(m.encryptedSubject, m.ivSubject, key!);
-          const body = decrypt(m.encryptedBodyPlain, m.ivBodyPlain, key!);
+          // CLI decrypt() is synchronous (Node.js crypto, not Web Crypto)
+          const from = stripBidi(decrypt(m.encryptedFrom, m.ivFrom, key!));
+          const subject = stripBidi(decrypt(m.encryptedSubject, m.ivSubject, key!));
+          const body = stripBidi(decrypt(m.encryptedBodyPlain, m.ivBodyPlain, key!));
           decrypted.push({ id: m._id, from, subject, body, receivedAt: m.receivedAt, read: m.read });
         } catch { /* skip */ }
       }
@@ -122,7 +133,7 @@ function BrowserUI({ passphrase }: { passphrase: string }) {
   return (
     <Box flexDirection="column">
       <Box borderStyle="round" borderColor="green" paddingX={1}>
-        <Text color="green" bold>GhostMail </Text>
+        <Text color="green" bold>Tacitus </Text>
         <Text color="gray">↑↓ navigate · Enter open · b/Esc back · q quit</Text>
       </Box>
 
@@ -169,6 +180,11 @@ function BrowserUI({ passphrase }: { passphrase: string }) {
             <Text color="gray">{formatTime(selectedMsg.receivedAt)}</Text>
             <Text> </Text>
             <Text color="white" wrap="wrap">{selectedMsg.body.slice(0, 2000)}</Text>
+            {selectedMsg.body.length > 2000 && (
+              <Text color="yellow" dimColor>
+                {`… ${selectedMsg.body.length - 2000} more characters — view full message in web UI`}
+              </Text>
+            )}
           </Box>
         )}
       </Box>
@@ -201,5 +217,8 @@ export default class M extends Command {
 
     const { waitUntilExit } = render(<BrowserUI passphrase={pp} />);
     await waitUntilExit();
+    // Best-effort: overwrite the reference (JS strings are immutable — cannot zero memory,
+    // but releasing the reference allows GC to collect it sooner)
+    pp = "";
   }
 }

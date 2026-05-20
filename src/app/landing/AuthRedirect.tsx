@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useConvexAuth } from "convex/react";
 import { useRouter } from "next/navigation";
+import { getStoredConvexUrl } from "@/lib/convexConfig";
 
-// Blocks the landing page from rendering until auth state is confirmed.
-// Prevents authenticated users from seeing the marketing page + wrong CTAs
-// during the window between hydration and the Convex auth check resolving.
-export function AuthRedirect() {
+function AuthRedirectInner() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const router = useRouter();
 
@@ -17,9 +15,6 @@ export function AuthRedirect() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Suppress the entire page while auth state is unknown or redirect is pending.
-  // This prevents: (a) wrong CTAs showing to logged-in users, (b) flash of
-  // marketing content before /inbox redirect fires.
   if (isLoading || isAuthenticated) {
     return (
       <div style={{
@@ -37,4 +32,17 @@ export function AuthRedirect() {
   }
 
   return null;
+}
+
+export function AuthRedirect() {
+  // Use state + effect to avoid SSR/hydration mismatch on the localStorage check
+  const [hasConfig, setHasConfig] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setHasConfig(getStoredConvexUrl() !== null);
+  }, []);
+
+  // null = still checking; render nothing until client-side check resolves
+  if (!hasConfig) return null;
+  return <AuthRedirectInner />;
 }
