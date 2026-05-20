@@ -41,7 +41,7 @@ function Shell({ step, children }: { step: Step; children: React.ReactNode }) {
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
           <div style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "0.2em", color: "#00ff8c", marginBottom: "0.5rem" }}>◈ TACITUS</div>
-          <div style={{ fontSize: "0.58rem", letterSpacing: "0.28em", color: "#2d4050" }}>DEPLOYMENT SETUP</div>
+          <div style={{ fontSize: "0.62rem", letterSpacing: "0.28em", color: "#4a7060" }}>DEPLOYMENT SETUP</div>
         </div>
 
         {/* Step progress */}
@@ -59,13 +59,13 @@ function Shell({ step, children }: { step: Step; children: React.ReactNode }) {
         </div>
 
         <div style={{ border: "1px solid rgba(0,255,140,0.12)", background: "rgba(8,13,20,0.98)", padding: "2rem" }}>
-          <div style={{ fontSize: "0.6rem", letterSpacing: "0.25em", color: "#2d4050", marginBottom: "1.25rem" }}>
+          <div style={{ fontSize: "0.65rem", letterSpacing: "0.2em", color: "#5a8070", marginBottom: "1.25rem" }}>
             STEP {step + 1} / 5 — {STEP_LABELS[step]}
           </div>
           {children}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.58rem", letterSpacing: "0.14em", color: "#1a2a36" }}>
+        <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#3a5548" }}>
           AES-256-GCM · PBKDF2 600K · ZERO SERVER KNOWLEDGE
         </div>
       </div>
@@ -82,8 +82,8 @@ function NextBtn({ onClick, disabled, children }: { onClick: () => void; disable
       style={{
         width: "100%", padding: "0.8rem",
         background: disabled ? "rgba(0,255,140,0.06)" : "#00ff8c",
-        color: disabled ? "#2d4050" : "#080d14",
-        border: disabled ? "1px solid rgba(0,255,140,0.1)" : "none",
+        color: disabled ? "#4a7060" : "#080d14",
+        border: disabled ? "1px solid rgba(0,255,140,0.2)" : "none",
         fontSize: "0.72rem", letterSpacing: "0.15em", fontFamily: "inherit", fontWeight: 700,
         cursor: disabled ? "not-allowed" : "pointer",
         clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px))",
@@ -106,7 +106,7 @@ function Code({ children }: { children: React.ReactNode }) {
       <pre style={{
         background: "#050a10", border: "1px solid rgba(0,255,140,0.12)",
         padding: "0.9rem 2.5rem 0.9rem 0.9rem",
-        fontSize: "0.72rem", color: "#00a060", lineHeight: 1.6,
+        fontSize: "0.75rem", color: "#00cc70", lineHeight: 1.6,
         overflowX: "auto", margin: 0, wordBreak: "break-all", whiteSpace: "pre-wrap",
       }}>{children}</pre>
       {text && (
@@ -115,8 +115,8 @@ function Code({ children }: { children: React.ReactNode }) {
           onClick={copy}
           style={{
             position: "absolute", top: "0.5rem", right: "0.5rem",
-            background: "none", border: "none", color: copied ? "#00ff8c" : "#2d4050",
-            fontSize: "0.58rem", letterSpacing: "0.1em", fontFamily: "inherit",
+            background: "none", border: "none", color: copied ? "#00ff8c" : "#4a7060",
+            fontSize: "0.62rem", letterSpacing: "0.1em", fontFamily: "inherit",
             cursor: "pointer", transition: "color 0.15s",
           }}
         >
@@ -136,7 +136,7 @@ function Check({ checked, onChange, children }: { checked: boolean; onChange: (v
         onChange={(e) => onChange(e.target.checked)}
         style={{ accentColor: "#00ff8c", marginTop: "2px", flexShrink: 0 }}
       />
-      <span style={{ fontSize: "0.65rem", color: "#4a6070", letterSpacing: "0.04em", lineHeight: 1.5 }}>
+      <span style={{ fontSize: "0.75rem", color: "#8ab0c0", letterSpacing: "0.02em", lineHeight: 1.5 }}>
         {children}
       </span>
     </label>
@@ -145,7 +145,7 @@ function Check({ checked, onChange, children }: { checked: boolean; onChange: (v
 
 function Body({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ fontSize: "0.7rem", lineHeight: 1.75, color: "#4a6070", marginBottom: "1.25rem" }}>
+    <p style={{ fontSize: "0.8rem", lineHeight: 1.75, color: "#8ab0c0", marginBottom: "1.25rem" }}>
       {children}
     </p>
   );
@@ -179,7 +179,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         This wizard takes ~5 minutes. You will need a free{" "}
         <Anchor href="https://convex.dev">Convex account</Anchor> — no technical knowledge required.
       </Body>
-      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.1)", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.65rem", color: "#4a8060", lineHeight: 1.6 }}>
+      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.15)", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.75rem", color: "#7abf9a", lineHeight: 1.6 }}>
         ◈ Your encryption key never leaves your browser.
         Convex only stores ciphertext. Even if someone compromised your Convex account, they could not read your messages.
       </div>
@@ -202,14 +202,14 @@ function StepConvexAccount({ onNext }: { onNext: () => void }) {
         The next step will automatically create and deploy your project.
       </Body>
       <div style={{ marginBottom: "1.25rem" }}>
-        <div style={{ fontSize: "0.6rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.75rem" }}>STEPS</div>
+        <div style={{ fontSize: "0.65rem", letterSpacing: "0.18em", color: "#5a8070", marginBottom: "0.75rem" }}>STEPS</div>
         {[
           ["1", "Go to dashboard.convex.dev"],
           ["2", "Sign up with GitHub or Google"],
         ].map(([n, label]) => (
           <div key={n} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", marginBottom: "0.5rem" }}>
-            <span style={{ fontSize: "0.6rem", color: "#00a060", letterSpacing: "0.1em", flexShrink: 0, marginTop: "1px" }}>[{n}]</span>
-            <span style={{ fontSize: "0.68rem", color: "#4a6070", lineHeight: 1.5 }}>{label}</span>
+            <span style={{ fontSize: "0.65rem", color: "#00cc70", letterSpacing: "0.1em", flexShrink: 0, marginTop: "1px" }}>[{n}]</span>
+            <span style={{ fontSize: "0.8rem", color: "#8ab0c0", lineHeight: 1.5 }}>{label}</span>
           </div>
         ))}
       </div>
@@ -289,7 +289,7 @@ function StepAuthSecret({ onNext }: { onNext: () => void }) {
         Your backend needs a secret key to sign login tokens. We have generated one for you — just copy it and paste it into the Convex dashboard.
       </Body>
 
-      <div style={{ fontSize: "0.6rem", letterSpacing: "0.18em", color: "#2d4050", marginBottom: "0.5rem" }}>
+      <div style={{ fontSize: "0.65rem", letterSpacing: "0.18em", color: "#5a8070", marginBottom: "0.5rem" }}>
         YOUR AUTH_SECRET
       </div>
       <Code>{secret}</Code>
@@ -316,7 +316,7 @@ function StepAuthSecret({ onNext }: { onNext: () => void }) {
         OPEN CONVEX DASHBOARD ↗
       </a>
 
-      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.1)", padding: "0.85rem", marginBottom: "1.25rem", fontSize: "0.63rem", color: "#4a8060", lineHeight: 1.6 }}>
+      <div style={{ background: "rgba(0,255,140,0.04)", border: "1px solid rgba(0,255,140,0.15)", padding: "0.85rem", marginBottom: "1.25rem", fontSize: "0.75rem", color: "#7abf9a", lineHeight: 1.6 }}>
         ◈ This secret only exists here — copy it now. You will not need to store it anywhere else.
       </div>
 
@@ -355,7 +355,7 @@ function StepConnect({ onDone }: { onDone: () => void }) {
       </Body>
 
       <div style={{ marginBottom: "1rem" }}>
-        <div style={{ fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d4050", marginBottom: "0.4rem" }}>
+        <div style={{ fontSize: "0.65rem", letterSpacing: "0.2em", color: "#5a8070", marginBottom: "0.4rem" }}>
           DEPLOYMENT URL
         </div>
         <input
@@ -403,7 +403,7 @@ function Done({ onGo }: { onGo: () => void }) {
         <div style={{ fontSize: "0.7rem", letterSpacing: "0.2em", color: "#00ff8c", marginBottom: "0.75rem" }}>
           DEPLOYMENT CONFIGURED
         </div>
-        <div style={{ fontSize: "0.68rem", color: "#4a6070", lineHeight: 1.7, marginBottom: "2rem" }}>
+        <div style={{ fontSize: "0.8rem", color: "#8ab0c0", lineHeight: 1.7, marginBottom: "2rem" }}>
           Your Convex backend is connected. You can now create your account.
         </div>
         <NextBtn onClick={onGo}>CONTINUE TO SIGN IN →</NextBtn>
@@ -421,7 +421,7 @@ function ReconfigurePrompt({ onContinue, onReconfigure }: { onContinue: () => vo
       <Body>
         A Convex deployment is already configured. You can continue with the existing configuration or replace it.
       </Body>
-      <div style={{ background: "rgba(255,200,0,0.04)", border: "1px solid rgba(255,200,0,0.1)", padding: "0.85rem", marginBottom: "1.5rem", fontSize: "0.63rem", color: "#a08040", lineHeight: 1.6 }}>
+      <div style={{ background: "rgba(255,200,0,0.04)", border: "1px solid rgba(255,200,0,0.15)", padding: "0.85rem", marginBottom: "1.5rem", fontSize: "0.75rem", color: "#c8a040", lineHeight: 1.6 }}>
         ⚠ Replacing the deployment URL will log you out and disconnect your current database.
         Your encrypted data stays in the old Convex project — it will not be migrated.
       </div>
@@ -432,9 +432,9 @@ function ReconfigurePrompt({ onContinue, onReconfigure }: { onContinue: () => vo
           onClick={onReconfigure}
           style={{
             flex: 1, padding: "0.8rem",
-            background: "transparent", color: "#4a6070",
-            border: "1px solid rgba(0,255,140,0.15)",
-            fontSize: "0.68rem", letterSpacing: "0.12em", fontFamily: "inherit",
+            background: "transparent", color: "#8ab0c0",
+            border: "1px solid rgba(0,255,140,0.2)",
+            fontSize: "0.75rem", letterSpacing: "0.12em", fontFamily: "inherit",
             cursor: "pointer",
           }}
         >
